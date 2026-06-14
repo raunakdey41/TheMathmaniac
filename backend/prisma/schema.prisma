@@ -1,0 +1,184 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              String            @id @default(uuid())
+  name            String
+  email           String            @unique
+  phoneNumber     String            @unique
+  googleId        String?
+  passwordHash    String?
+  role            String            @default("STUDENT")
+  purchases       Purchase[]
+  lectureProgress LectureProgress[]
+  results         Result[]
+  notifications   Notification[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([email])
+  @@index([phoneNumber])
+}
+
+model CourseCategory {
+  id      String   @id @default(uuid())
+  name    String
+  slug    String   @unique
+  courses Course[]
+}
+
+model Course {
+  id               String          @id @default(uuid())
+  title            String
+  description      String
+  thumbnailUrl     String
+  price            Int
+  categoryId       String
+  category         CourseCategory  @relation(fields: [categoryId], references: [id])
+  instructorName   String
+  learningOutcomes String
+  published        Boolean         @default(false)
+  lectures         Lecture[]
+  purchases        Purchase[]
+  tests            Test[]
+  studyMaterials   StudyMaterial[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model Lecture {
+  id              String            @id @default(uuid())
+  courseId        String
+  course          Course            @relation(fields: [courseId], references: [id])
+  title           String
+  description     String
+  videoUrl        String
+  duration        Int
+  sortOrder       Int
+  notesUrl        String?
+  lectureProgress LectureProgress[]
+
+  @@index([courseId])
+}
+
+model LectureProgress {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  lectureId    String
+  lecture      Lecture  @relation(fields: [lectureId], references: [id])
+  lastPosition Int      @default(0)
+  completed    Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, lectureId])
+  @@index([userId])
+  @@index([lectureId])
+}
+
+model Purchase {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  courseId         String
+  course           Course   @relation(fields: [courseId], references: [id])
+  amount           Int
+  status           String
+  razorpayOrderId  String   @unique
+  razorpayPaymentId String?
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([courseId])
+}
+
+model Test {
+  id         String     @id @default(uuid())
+  courseId   String?
+  course     Course?    @relation(fields: [courseId], references: [id])
+  title      String
+  duration   Int
+  totalMarks Int
+  published  Boolean    @default(false)
+  questions  Question[]
+  results    Result[]
+
+  @@index([courseId])
+}
+
+model Question {
+  id              String           @id @default(uuid())
+  testId          String
+  test            Test             @relation(fields: [testId], references: [id])
+  text            String
+  type            String
+  numericalAnswer String?
+  marks           Int
+  explanation     String
+  options         QuestionOption[]
+
+  @@index([testId])
+}
+
+model QuestionOption {
+  id         String   @id @default(uuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+  text       String
+  isCorrect  Boolean
+
+  @@index([questionId])
+}
+
+model Result {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  testId         String
+  test           Test     @relation(fields: [testId], references: [id])
+  score          Int
+  accuracy       Float
+  answersPayload String
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([testId])
+}
+
+model StudyMaterial {
+  id        String   @id @default(uuid())
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id])
+  title     String
+  type      String
+  fileUrl   String
+  fileSize  Int
+  createdAt DateTime @default(now())
+
+  @@index([courseId])
+}
+
+model Announcement {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

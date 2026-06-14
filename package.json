@@ -1,0 +1,16 @@
+{
+  "name": "mathemaniac-workspace",
+  "version": "1.0.0",
+  "description": "Root workspace workspace for Mathemaniac (Synapse EduTech)",
+  "scripts": {
+    "backend:install": "npm install --prefix backend",
+    "backend:migrate": "npx --prefix backend prisma migrate dev --schema backend/prisma/schema.prisma",
+    "backend:seed": "npm run --prefix backend prisma:seed",
+    "backend:dev": "npm run --prefix backend dev",
+    "mobile:install": "npm install --prefix mobile",
+    "mobile:start": "npm run --prefix mobile start",
+    "mobile:android": "npm run --prefix mobile android",
+    "mobile:ios": "npm run --prefix mobile ios"
+  },
+  "private": true
+}
