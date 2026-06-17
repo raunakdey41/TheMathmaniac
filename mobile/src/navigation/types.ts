@@ -13,7 +13,8 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Login: undefined;
   Signup: undefined;
-  OTPVerification: { phoneNumber: string; name?: string; role?: string };
+  ForgotPassword: undefined;
+  OTPVerification: { phoneNumber: string; mode: 'signup' | 'login' | 'forgot_password'; name?: string; role?: string };
   AppTabs: NavigatorScreenParams<AppTabsParamList>;
   CourseDetails: { courseId: string };
   PurchaseWebview: { courseId: string; amount: number; orderId: string; title: string };

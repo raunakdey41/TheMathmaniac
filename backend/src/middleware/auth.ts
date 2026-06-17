@@ -6,8 +6,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'mathemaniac_secret_key';
 export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
-    email: string;
+    phoneNumber: string;
     role: string;
+    email?: string;
   };
 }
 
@@ -22,7 +23,7 @@ export function authenticateJWT(req: AuthenticatedRequest, res: Response, next: 
         return res.status(403).json({ success: false, error: 'Forbidden: Invalid or expired token' });
       }
 
-      req.user = decoded as { id: string; email: string; role: string };
+      req.user = decoded as { id: string; phoneNumber: string; role: string; email?: string };
       next();
     });
   } else {

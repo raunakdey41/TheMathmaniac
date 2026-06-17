@@ -15,11 +15,11 @@ interface Props {
 }
 
 export const OTPVerificationScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { phoneNumber, role } = route.params;
+  const { phoneNumber, role, name, mode } = route.params;
   const [code, setCode] = useState('');
   const [timer, setTimer] = useState(30);
 
-  const { verifyOtp, sendOtp, isLoading, error } = useAuthStore();
+  const { verifyOtp, verifyRegisterOtp, sendOtp, resendRegisterOtp, isLoading, error } = useAuthStore();
 
   useEffect(() => {
     let interval: any;
@@ -36,7 +36,9 @@ export const OTPVerificationScreen: React.FC<Props> = ({ route, navigation }) =>
       Alert.alert('Invalid Code', 'Please enter the 6-digit OTP code');
       return;
     }
-    const success = await verifyOtp(phoneNumber, code, undefined, role);
+    const success = mode === 'signup'
+      ? await verifyRegisterOtp(phoneNumber, code)
+      : await verifyOtp(phoneNumber, code, name, role);
     if (success) {
       navigation.replace('AppTabs', { screen: 'Home' });
     }
@@ -44,7 +46,9 @@ export const OTPVerificationScreen: React.FC<Props> = ({ route, navigation }) =>
 
   const handleResend = async () => {
     if (timer === 0) {
-      const success = await sendOtp(phoneNumber);
+      const success = mode === 'signup'
+        ? await resendRegisterOtp(phoneNumber)
+        : await sendOtp(phoneNumber);
       if (success) {
         setTimer(30);
         Alert.alert('OTP Resent', 'Verification code has been resent to your mobile number.');

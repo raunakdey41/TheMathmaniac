@@ -50,7 +50,7 @@ export const MathRenderer: React.FC<MathRendererProps> = ({
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
           font-size: 16px;
           line-height: 1.5;
-          color: ${isDarkText ? '#15100A' : '#F8FAFC'};
+          color: ${isDarkText ? '#1F2937' : '#F8FAFC'};
           background-color: transparent;
           margin: 0;
           padding: 0;

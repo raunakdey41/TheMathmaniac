@@ -110,7 +110,7 @@ export const HomeScreen: React.FC = () => {
 
       <ScrollView
         className="flex-1 px-5 pt-4"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8A2222" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D8C82" />}
       >
         {loading ? (
           // Loading skeletons

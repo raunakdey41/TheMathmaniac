@@ -187,7 +187,7 @@ export const TeacherMaterialsScreen: React.FC = () => {
 
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#8A2222" />
+          <ActivityIndicator size="large" color="#2D8C82" />
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false}>

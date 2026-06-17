@@ -65,7 +65,7 @@ export const PDFViewerScreen: React.FC<Props> = ({ route }) => {
         </Text>
         <TouchableOpacity onPress={simulateDownload} disabled={downloading}>
           {downloading ? (
-            <ActivityIndicator size="small" color="#8A2222" />
+             <ActivityIndicator size="small" color="#2D8C82" />
           ) : (
             <Text className="text-blue-400 text-sm font-semibold">Save</Text>
           )}
@@ -82,7 +82,7 @@ export const PDFViewerScreen: React.FC<Props> = ({ route }) => {
             startInLoadingState={true}
             renderLoading={() => (
               <View className="absolute inset-0 justify-center items-center bg-slate-950">
-                <ActivityIndicator size="large" color="#8A2222" />
+                 <ActivityIndicator size="large" color="#2D8C82" />
                 <Text className="text-slate-500 text-xs mt-3 font-semibold">Loading PDF Document...</Text>
               </View>
             )}

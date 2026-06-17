@@ -48,7 +48,7 @@ export const TestsListScreen: React.FC = () => {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8A2222" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D8C82" />}
       >
         {loading ? (
           <View className="space-y-4">

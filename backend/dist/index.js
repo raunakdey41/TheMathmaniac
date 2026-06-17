@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv = __importStar(require("dotenv"));
+const path_1 = __importDefault(require("path"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const courses_1 = __importDefault(require("./routes/courses"));
 const lectures_1 = __importDefault(require("./routes/lectures"));
@@ -52,6 +53,7 @@ const PORT = process.env.PORT || 3000;
 // Middleware configurations
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
+app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
 // Routes Bindings
 app.use('/api/v1/auth', auth_1.default);
 app.use('/api/v1/courses', courses_1.default);

@@ -194,7 +194,7 @@ export const ProfileHomeScreen: React.FC = () => {
     <View className="flex-1 bg-slate-950 px-5 pt-14">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8A2222" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D8C82" />}
       >
         {loading ? (
           <View className="space-y-6">

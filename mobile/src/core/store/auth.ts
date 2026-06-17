@@ -5,7 +5,7 @@ import { secureStorage } from '../storage/secure';
 export interface User {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phoneNumber: string;
   role: string;
 }
@@ -21,9 +21,12 @@ interface AuthState {
   initializeAuth: () => Promise<void>;
   sendOtp: (phoneNumber: string) => Promise<boolean>;
   verifyOtp: (phoneNumber: string, code: string, name?: string, role?: string) => Promise<boolean>;
-  loginWithEmail: (email: string, password: string, role?: string) => Promise<boolean>;
-  loginWithGoogle: (email: string, name: string, googleId: string) => Promise<boolean>;
-  signupWithEmail: (name: string, email: string, phoneNumber: string, password: string, role?: string) => Promise<boolean>;
+  login: (phoneNumber: string, password: string) => Promise<boolean>;
+  register: (name: string, phoneNumber: string, password: string) => Promise<boolean>;
+  verifyRegisterOtp: (phoneNumber: string, code: string) => Promise<boolean>;
+  resendRegisterOtp: (phoneNumber: string) => Promise<boolean>;
+  sendForgotPasswordOtp: (phoneNumber: string) => Promise<boolean>;
+  resetPassword: (phoneNumber: string, code: string, newPassword: string) => Promise<boolean>;
   logout: () => Promise<void>;
 }
 
@@ -93,13 +96,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  loginWithEmail: async (email: string, password: string, role?: string) => {
+  login: async (phoneNumber, password) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await apiClient.post('/auth/login', { email, password, role });
+      const response = await apiClient.post('/auth/login', { phoneNumber, password });
       const { accessToken, refreshToken, user } = response.data.data;
       await secureStorage.saveTokens(accessToken, refreshToken);
-
       set({
         user,
         accessToken,
@@ -108,40 +110,31 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
       return true;
     } catch (error: any) {
-      const msg = error.response?.data?.error || (error.request ? 'Connection failed. Please check if the backend server is running.' : error.message) || 'Invalid email or password';
+      const msg = error.response?.data?.error || (error.request ? 'Connection failed. Please check if the backend server is running.' : error.message) || 'Failed to login';
       set({ error: msg, isLoading: false });
       return false;
     }
   },
 
-  loginWithGoogle: async (email: string, name: string, googleId: string) => {
+  register: async (name, phoneNumber, password) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await apiClient.post('/auth/google', { email, name, googleId });
-      const { accessToken, refreshToken, user } = response.data.data;
-      await secureStorage.saveTokens(accessToken, refreshToken);
-
-      set({
-        user,
-        accessToken,
-        isAuthenticated: true,
-        isLoading: false,
-      });
+      await apiClient.post('/auth/register', { name, phoneNumber, password });
+      set({ isLoading: false });
       return true;
     } catch (error: any) {
-      const msg = error.response?.data?.error || (error.request ? 'Connection failed. Please check if the backend server is running.' : error.message) || 'Google Login failed';
+      const msg = error.response?.data?.error || (error.request ? 'Connection failed. Please check if the backend server is running.' : error.message) || 'Failed to register';
       set({ error: msg, isLoading: false });
       return false;
     }
   },
 
-  signupWithEmail: async (name: string, email: string, phoneNumber: string, password: string, role?: string) => {
+  verifyRegisterOtp: async (phoneNumber, code) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await apiClient.post('/auth/signup', { name, email, phoneNumber, password, role });
+      const response = await apiClient.post('/auth/register/verify', { phoneNumber, code });
       const { accessToken, refreshToken, user } = response.data.data;
       await secureStorage.saveTokens(accessToken, refreshToken);
-
       set({
         user,
         accessToken,
@@ -150,7 +143,46 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
       return true;
     } catch (error: any) {
-      const msg = error.response?.data?.error || (error.request ? 'Connection failed. Please check if the backend server is running.' : error.message) || 'Registration failed';
+      const msg = error.response?.data?.error || (error.request ? 'Connection failed. Please check if the backend server is running.' : error.message) || 'Failed to verify registration code';
+      set({ error: msg, isLoading: false });
+      return false;
+    }
+  },
+
+  resendRegisterOtp: async (phoneNumber) => {
+    set({ isLoading: true, error: null });
+    try {
+      await apiClient.post('/auth/register/resend', { phoneNumber });
+      set({ isLoading: false });
+      return true;
+    } catch (error: any) {
+      const msg = error.response?.data?.error || (error.request ? 'Connection failed. Please check if the backend server is running.' : error.message) || 'Failed to resend registration code';
+      set({ error: msg, isLoading: false });
+      return false;
+    }
+  },
+
+  sendForgotPasswordOtp: async (phoneNumber) => {
+    set({ isLoading: true, error: null });
+    try {
+      await apiClient.post('/auth/forgot-password/send', { phoneNumber });
+      set({ isLoading: false });
+      return true;
+    } catch (error: any) {
+      const msg = error.response?.data?.error || (error.request ? 'Connection failed. Please check if the backend server is running.' : error.message) || 'Failed to send password reset OTP';
+      set({ error: msg, isLoading: false });
+      return false;
+    }
+  },
+
+  resetPassword: async (phoneNumber, code, newPassword) => {
+    set({ isLoading: true, error: null });
+    try {
+      await apiClient.post('/auth/forgot-password/reset', { phoneNumber, code, newPassword });
+      set({ isLoading: false });
+      return true;
+    } catch (error: any) {
+      const msg = error.response?.data?.error || (error.request ? 'Connection failed. Please check if the backend server is running.' : error.message) || 'Failed to reset password';
       set({ error: msg, isLoading: false });
       return false;
     }

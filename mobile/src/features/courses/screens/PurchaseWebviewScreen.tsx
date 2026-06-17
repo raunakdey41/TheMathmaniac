@@ -88,7 +88,7 @@ export const PurchaseWebviewScreen: React.FC<Props> = ({ route }) => {
 
       {loading ? (
         <View className="items-center py-10">
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color="#2D8C82" />
           <Text className="text-slate-400 text-xs font-bold mt-4">Verifying secure signatures...</Text>
         </View>
       ) : (

@@ -175,12 +175,12 @@ export const TeacherTestsScreen: React.FC = () => {
 
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#8A2222" />
+          <ActivityIndicator size="large" color="#2D8C82" />
         </View>
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8A2222" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D8C82" />}
         >
           <View className="pb-24">
             {tests.length > 0 ? (
@@ -312,7 +312,7 @@ export const TeacherTestsScreen: React.FC = () => {
 
             {loadingSubmissions ? (
               <View className="flex-1 justify-center items-center py-20">
-                <ActivityIndicator size="large" color="#8A2222" />
+                <ActivityIndicator size="large" color="#2D8C82" />
               </View>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false}>

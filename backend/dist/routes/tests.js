@@ -6,12 +6,47 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
+const multer_1 = __importDefault(require("multer"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 const router = (0, express_1.Router)();
-// 1. Get Tests List
+// Setup upload directory
+const uploadDir = path_1.default.join(__dirname, '../../uploads');
+if (!fs_1.default.existsSync(uploadDir)) {
+    fs_1.default.mkdirSync(uploadDir, { recursive: true });
+}
+const storage = multer_1.default.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        cb(null, uniqueSuffix + path_1.default.extname(file.originalname));
+    },
+});
+const upload = (0, multer_1.default)({
+    storage,
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true);
+        }
+        else {
+            cb(new Error('Only PDF files are allowed!'));
+        }
+    },
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+});
+// 1. Get Tests List (Teachers see published/unpublished, students see published only)
 router.get('/', auth_1.authenticateJWT, async (req, res) => {
     try {
+        const userRole = req.user?.role;
+        const isTeacher = userRole === 'TEACHER' || userRole === 'ADMIN';
+        const whereClause = {};
+        if (!isTeacher) {
+            whereClause.published = true;
+        }
         const tests = await db_1.default.test.findMany({
-            where: { published: true },
+            where: whereClause,
             include: {
                 course: {
                     select: { title: true },
@@ -58,6 +93,9 @@ router.get('/:id', auth_1.authenticateJWT, async (req, res) => {
                 title: test.title,
                 duration: test.duration,
                 totalMarks: test.totalMarks,
+                pdfUrl: test.pdfUrl,
+                pdfSize: test.pdfSize,
+                pdfName: test.pdfName,
                 questions: safeQuestions,
             },
         });
@@ -213,6 +251,88 @@ router.get('/:id/leaderboard', auth_1.authenticateJWT, async (req, res) => {
             success: true,
             data: uniqueLeaderboard,
         });
+    }
+    catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+// 5. Upload PDF Question Paper to Test (Requires Auth)
+router.post('/:id/upload-pdf', auth_1.authenticateJWT, upload.single('file'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'A PDF file is required' });
+        }
+        const test = await db_1.default.test.findUnique({
+            where: { id },
+        });
+        if (!test) {
+            return res.status(404).json({ success: false, error: 'Test not found' });
+        }
+        // Try deleting old file if it exists
+        if (test.pdfUrl) {
+            try {
+                const oldFilename = test.pdfUrl.split('/uploads/')[1];
+                if (oldFilename) {
+                    const oldFilePath = path_1.default.join(uploadDir, oldFilename);
+                    if (fs_1.default.existsSync(oldFilePath)) {
+                        fs_1.default.unlinkSync(oldFilePath);
+                    }
+                }
+            }
+            catch (err) {
+                console.error('Error deleting old test PDF:', err);
+            }
+        }
+        const pdfUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        const updatedTest = await db_1.default.test.update({
+            where: { id },
+            data: {
+                pdfUrl,
+                pdfSize: req.file.size,
+                pdfName: req.file.originalname,
+            },
+        });
+        return res.status(200).json({ success: true, data: updatedTest });
+    }
+    catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+// 6. Delete PDF Question Paper from Test (Requires Auth)
+router.delete('/:id/pdf', auth_1.authenticateJWT, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const test = await db_1.default.test.findUnique({
+            where: { id },
+        });
+        if (!test) {
+            return res.status(404).json({ success: false, error: 'Test not found' });
+        }
+        // Delete file from disk
+        if (test.pdfUrl) {
+            try {
+                const filename = test.pdfUrl.split('/uploads/')[1];
+                if (filename) {
+                    const filePath = path_1.default.join(uploadDir, filename);
+                    if (fs_1.default.existsSync(filePath)) {
+                        fs_1.default.unlinkSync(filePath);
+                    }
+                }
+            }
+            catch (err) {
+                console.error('Error deleting test PDF file:', err);
+            }
+        }
+        const updatedTest = await db_1.default.test.update({
+            where: { id },
+            data: {
+                pdfUrl: null,
+                pdfSize: null,
+                pdfName: null,
+            },
+        });
+        return res.status(200).json({ success: true, data: updatedTest });
     }
     catch (error) {
         return res.status(500).json({ success: false, error: error.message });

@@ -114,7 +114,7 @@ export const MaterialsListScreen: React.FC = () => {
       {/* Materials List Scroll */}
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563EB" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D8C82" />}
       >
         {loading ? (
           <View className="space-y-4">

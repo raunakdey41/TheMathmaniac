@@ -148,7 +148,7 @@ export const LecturePlayerScreen: React.FC<Props> = ({ route }) => {
       <View className="bg-black w-full h-64 justify-center relative">
         {isPlaying ? (
           <View className="items-center justify-center flex-1">
-            <ActivityIndicator size="small" color="#2563EB" />
+            <ActivityIndicator size="small" color="#2D8C82" />
             <Text className="text-slate-400 text-xs font-semibold mt-3">
               Streaming HLS Video...
             </Text>

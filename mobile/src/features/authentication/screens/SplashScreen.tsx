@@ -46,7 +46,7 @@ export const SplashScreen: React.FC<Props> = ({ navigation }) => {
         </Text>
       </View>
 
-      <ActivityIndicator size="small" color="#8A2222" className="absolute bottom-16" />
+      <ActivityIndicator size="small" color="#2D8C82" className="absolute bottom-16" />
     </View>
   );
 };

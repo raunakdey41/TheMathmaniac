@@ -30,7 +30,7 @@ export const TeacherHomeScreen: React.FC = () => {
 
       <ScrollView
         className="flex-1 px-5 pt-4"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8A2222" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2D8C82" />}
       >
         <View className="pb-12">
           {/* Quick Info Card */}

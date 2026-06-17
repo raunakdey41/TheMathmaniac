@@ -12,6 +12,7 @@ import { SplashScreen } from '../features/authentication/screens/SplashScreen';
 import { OnboardingScreen } from '../features/authentication/screens/OnboardingScreen';
 import { LoginScreen } from '../features/authentication/screens/LoginScreen';
 import { SignupScreen } from '../features/authentication/screens/SignupScreen';
+import { ForgotPasswordScreen } from '../features/authentication/screens/ForgotPasswordScreen';
 import { OTPVerificationScreen } from '../features/authentication/screens/OTPVerificationScreen';
 import { HomeScreen } from '../features/home/screens/HomeScreen';
 import { CoursesExploreScreen } from '../features/courses/screens/CoursesExploreScreen';
@@ -42,15 +43,15 @@ function TabNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#F5F2EA', // Synapse light card bg
+          backgroundColor: '#FFFFFF', // Pure White surface
           borderTopWidth: 1,
-          borderTopColor: 'rgba(160, 140, 85, 0.26)', // Synapse border
+          borderTopColor: 'rgba(45, 140, 130, 0.15)', // Subtle Ocean Teal border
           paddingBottom: 8,
           paddingTop: 8,
           height: 64,
         },
-        tabBarActiveTintColor: '#8A2222', // Warm and soothing red/maroon
-        tabBarInactiveTintColor: '#6A6050', // Synapse muted text
+        tabBarActiveTintColor: '#2D8C82', // Ocean Teal primary
+        tabBarInactiveTintColor: '#6B7280', // Secondary text grey
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '700',
@@ -69,7 +70,7 @@ function TabNavigator() {
                 width: 36,
                 height: 36,
                 borderRadius: 18,
-                backgroundColor: focused ? 'rgba(138, 34, 34, 0.12)' : 'transparent',
+                backgroundColor: focused ? 'rgba(45, 140, 130, 0.12)' : 'transparent',
                 justifyContent: 'center',
                 alignItems: 'center',
               }}
@@ -95,15 +96,15 @@ function TeacherTabNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#F5F2EA', // Synapse light card bg
+          backgroundColor: '#FFFFFF', // Pure White surface
           borderTopWidth: 1,
-          borderTopColor: 'rgba(160, 140, 85, 0.26)', // Synapse border
+          borderTopColor: 'rgba(45, 140, 130, 0.15)', // Subtle Ocean Teal border
           paddingBottom: 8,
           paddingTop: 8,
           height: 64,
         },
-        tabBarActiveTintColor: '#8A2222', // Warm and soothing red/maroon
-        tabBarInactiveTintColor: '#6A6050', // Synapse muted text
+        tabBarActiveTintColor: '#2D8C82', // Ocean Teal primary
+        tabBarInactiveTintColor: '#6B7280', // Secondary text grey
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '700',
@@ -122,7 +123,7 @@ function TeacherTabNavigator() {
                 width: 36,
                 height: 36,
                 borderRadius: 18,
-                backgroundColor: focused ? 'rgba(138, 34, 34, 0.12)' : 'transparent',
+                backgroundColor: focused ? 'rgba(45, 140, 130, 0.12)' : 'transparent',
                 justifyContent: 'center',
                 alignItems: 'center',
               }}
@@ -158,7 +159,7 @@ export const AppNavigator = () => {
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          cardStyle: { backgroundColor: '#EDEAE0' },
+          cardStyle: { backgroundColor: '#FAFBF8' },
         }}
         initialRouteName="Splash"
       >
@@ -166,6 +167,7 @@ export const AppNavigator = () => {
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Signup" component={SignupScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
         <Stack.Screen name="AppTabs" component={AppTabsWrapper} />
         <Stack.Screen name="CourseDetails" component={CourseDetailsScreen} />
