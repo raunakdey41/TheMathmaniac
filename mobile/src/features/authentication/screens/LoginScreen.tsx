@@ -4,6 +4,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../../navigation/types';
 import { useAuthStore } from '../../../core/store/auth';
 import { Button } from '../../../shared/components/Button';
+import { Eye, EyeOff } from 'lucide-react-native';
 
 type LoginScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -14,6 +15,7 @@ interface Props {
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<'STUDENT' | 'TEACHER' | 'ADMIN'>('STUDENT');
 
   const { login, isLoading, error, logout } = useAuthStore();
@@ -138,15 +140,24 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         <Text className="text-slate-300 text-xs font-bold uppercase tracking-wider mb-3">
           Password
         </Text>
-        <TextInput
-          className="bg-slate-800 border border-slate-700/50 rounded-2xl px-4 py-4 text-slate-100 text-base font-semibold mb-3"
-          placeholder="••••••••"
-          placeholderTextColor="#8A8070"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          keyboardType="default"
-        />
+        <View className="flex-row items-center bg-slate-800 border border-slate-700/50 rounded-2xl px-4 py-4 mb-3">
+          <TextInput
+            className="flex-1 text-slate-100 text-base font-semibold"
+            placeholder="••••••••"
+            placeholderTextColor="#8A8070"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+            keyboardType="default"
+          />
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="pl-2 pr-1">
+            {showPassword ? (
+              <EyeOff color="#94A3B8" size={20} />
+            ) : (
+              <Eye color="#94A3B8" size={20} />
+            )}
+          </TouchableOpacity>
+        </View>
 
         <View className="flex-row justify-between items-center mb-8">
           <TouchableOpacity 

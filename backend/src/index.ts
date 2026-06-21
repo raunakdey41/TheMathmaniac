@@ -13,13 +13,18 @@ import testRoutes from './routes/tests';
 import paymentRoutes from './routes/payments';
 import profileRoutes from './routes/profile';
 import attendanceRoutes from './routes/attendance';
+import superuserRoutes from './routes/superuser';
 import { startFirestoreListener } from './services/firestoreListener';
+import { startScheduler } from './services/scheduler';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Start Firestore real-time sync listener
 startFirestoreListener();
+
+// Start Daily Cron Scheduler
+startScheduler();
 
 // Middleware configurations
 app.use(cors());
@@ -45,6 +50,7 @@ app.use('/api/v1/tests', testRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/profile', profileRoutes);
 app.use('/api/v1/attendance', attendanceRoutes);
+app.use('/api/v1/superuser', superuserRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

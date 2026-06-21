@@ -40,6 +40,7 @@ router.get('/:id', auth_1.authenticateJWT, async (req, res) => {
             data: {
                 id: lecture.id,
                 courseId: lecture.courseId,
+                courseTitle: lecture.course.title,
                 title: lecture.title,
                 description: lecture.description,
                 videoUrl: lecture.videoUrl,

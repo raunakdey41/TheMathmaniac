@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../../navigation/types';
 import { useAuthStore } from '../../../core/store/auth';
 import { Button } from '../../../shared/components/Button';
+import { Eye, EyeOff } from 'lucide-react-native';
 
 type ForgotPasswordResetScreenProp = StackNavigationProp<RootStackParamList, 'ForgotPasswordReset'>;
 type ForgotPasswordResetScreenRouteProp = RouteProp<RootStackParamList, 'ForgotPasswordReset'>;
@@ -16,6 +17,8 @@ export const ForgotPasswordResetScreen: React.FC = () => {
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { resetPasswordWithToken, isLoading, error } = useAuthStore();
 
   const handleSubmit = async () => {
@@ -57,26 +60,44 @@ export const ForgotPasswordResetScreen: React.FC = () => {
         <Text className="text-slate-300 text-xs font-bold uppercase tracking-wider mb-3">
           New Password
         </Text>
-        <TextInput
-          className="bg-slate-800 border border-slate-700/50 rounded-2xl px-4 py-4 text-slate-100 text-base font-semibold mb-6"
-          placeholder="•••••••• (Min 6 chars)"
-          placeholderTextColor="#8A8070"
-          secureTextEntry
-          value={newPassword}
-          onChangeText={setNewPassword}
-        />
+        <View className="flex-row items-center bg-slate-800 border border-slate-700/50 rounded-2xl px-4 py-4 mb-6">
+          <TextInput
+            className="flex-1 text-slate-100 text-base font-semibold"
+            placeholder="•••••••• (Min 6 chars)"
+            placeholderTextColor="#8A8070"
+            secureTextEntry={!showNewPassword}
+            value={newPassword}
+            onChangeText={setNewPassword}
+          />
+          <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} className="pl-2 pr-1">
+            {showNewPassword ? (
+              <EyeOff color="#94A3B8" size={20} />
+            ) : (
+              <Eye color="#94A3B8" size={20} />
+            )}
+          </TouchableOpacity>
+        </View>
 
         <Text className="text-slate-300 text-xs font-bold uppercase tracking-wider mb-3">
           Confirm Password
         </Text>
-        <TextInput
-          className="bg-slate-800 border border-slate-700/50 rounded-2xl px-4 py-4 text-slate-100 text-base font-semibold mb-8"
-          placeholder="••••••••"
-          placeholderTextColor="#8A8070"
-          secureTextEntry
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-        />
+        <View className="flex-row items-center bg-slate-800 border border-slate-700/50 rounded-2xl px-4 py-4 mb-8">
+          <TextInput
+            className="flex-1 text-slate-100 text-base font-semibold"
+            placeholder="••••••••"
+            placeholderTextColor="#8A8070"
+            secureTextEntry={!showConfirmPassword}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+          />
+          <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="pl-2 pr-1">
+            {showConfirmPassword ? (
+              <EyeOff color="#94A3B8" size={20} />
+            ) : (
+              <Eye color="#94A3B8" size={20} />
+            )}
+          </TouchableOpacity>
+        </View>
 
         <Button
           title="Save Password"

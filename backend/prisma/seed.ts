@@ -54,8 +54,8 @@ async function main() {
 
   const testStudent = await prisma.user.create({
     data: {
-      name: 'Rohan Dey',
-      email: 'rohan@outlook.com',
+      name: 'Raunak Dey',
+      email: 'raunak@outlook.com',
       firstLogin: true,
       role: 'STUDENT',
     },
@@ -116,7 +116,7 @@ async function main() {
       thumbnailUrl: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&q=80&w=600',
       price: 199900, // INR 1999.00 in Paisa
       categoryId: categoryJee.id,
-      instructorName: 'Prof. S. Sen (IIT Kharagpur Alumnus)',
+      instructorName: 'Dr. S. Sen',
       learningOutcomes: JSON.stringify([
         'Understand graphical analysis of limits & continuity',
         'Solve complex derivatives using chain rule and implicit differentiation',
@@ -168,7 +168,7 @@ async function main() {
       thumbnailUrl: 'https://images.unsplash.com/photo-1453733190148-c44698c26588?auto=format&fit=crop&q=80&w=600',
       price: 49900, // INR 499.00 in Paisa
       categoryId: categoryOlympiad.id,
-      instructorName: 'S. K. Dey (Mathemaniac Founder)',
+      instructorName: 'S. K. Dey',
       learningOutcomes: JSON.stringify([
         'Master Modular Arithmetic and GCD properties',
         'Solve advanced visual geometry problems using properties of cyclic quadrilaterals',
@@ -346,19 +346,19 @@ async function main() {
 
   console.log('Announcements seeded.');
 
-  // 8. Seed Course Purchases for Rohan Dey (to have immediate access to Calculus)
+  // 8. Seed Course Purchases for Raunak Dey (to have immediate access to Calculus)
   await prisma.purchase.create({
     data: {
       userId: testStudent.id,
       courseId: courseCalculus.id,
       amount: 199900,
       status: 'SUCCESS',
-      razorpayOrderId: 'order_test_calculus_rohan',
-      razorpayPaymentId: 'pay_test_calculus_rohan',
+      razorpayOrderId: 'order_test_calculus_raunak',
+      razorpayPaymentId: 'pay_test_calculus_raunak',
     },
   });
 
-  // 9. Seed Lecture Progress for Rohan Dey
+  // 9. Seed Lecture Progress for Raunak Dey
   await prisma.lectureProgress.create({
     data: {
       userId: testStudent.id,
@@ -377,12 +377,12 @@ async function main() {
     },
   });
 
-  // 10. Seed Notifications for Rohan
+  // 10. Seed Notifications for Raunak
   await prisma.notification.create({
     data: {
       userId: testStudent.id,
       title: 'Welcome to Synapse EduTech!',
-      body: 'Hi Rohan, explore your courses, download formula sheets, and take quizzes to boost your JEE preparation.',
+      body: 'Hi Raunak, explore your courses, download formula sheets, and take quizzes to boost your JEE preparation.',
       read: false,
     },
   });

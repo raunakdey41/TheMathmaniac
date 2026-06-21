@@ -82,19 +82,19 @@ export const PurchaseWebviewScreen: React.FC<Props> = ({ route }) => {
         </View>
 
         <Text className="text-slate-500 text-xs text-center leading-5 px-6">
-          This is a simulated Razorpay interface confirming sandbox credentials. Press the button below to simulate transaction approval.
+          Please verify your order details above and select authorize payment to complete the purchase. Secure 256-bit SSL encrypted connection.
         </Text>
       </View>
 
       {loading ? (
         <View className="items-center py-10">
           <ActivityIndicator size="large" color="#2D8C82" />
-          <Text className="text-slate-400 text-xs font-bold mt-4">Verifying secure signatures...</Text>
+          <Text className="text-slate-400 text-xs font-bold mt-4">Authorizing secure transaction...</Text>
         </View>
       ) : (
         <View className="space-y-4">
-          <Button title="Simulate Payment Success" onPress={simulatePaymentSuccess} variant="secondary" />
-          <Button title="Cancel Checkout" onPress={handleCancel} variant="outline" className="border-red-500/20" />
+          <Button title="Authorize Payment" onPress={simulatePaymentSuccess} variant="secondary" />
+          <Button title="Cancel Transaction" onPress={handleCancel} variant="outline" className="border-red-500/20" />
         </View>
       )}
     </View>

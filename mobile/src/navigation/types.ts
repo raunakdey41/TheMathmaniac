@@ -25,4 +25,8 @@ export type RootStackParamList = {
   TestInstructions: { testId: string };
   ActiveTest: { testId: string };
   TestResult: { resultData: any };
+  FeePayment: undefined;
+  FeePaymentCheckout: { feeId: string; month: string; amount: number; orderId: string };
+  TeacherAttendanceTracking: undefined;
+  SuperuserReports: undefined;
 };

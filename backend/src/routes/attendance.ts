@@ -255,4 +255,233 @@ router.get('/my-attendance', authenticateJWT, async (req: AuthenticatedRequest, 
   }
 });
 
+// Geofence Coordinate Constants (Institute Location)
+const INST_LAT = 22.5726; // Kolkata region
+const INST_LON = 88.3639;
+const GEOFENCE_RADIUS_METERS = 15;
+
+// Haversine formula to compute geodesic distance in meters
+function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3; // Earth's radius in meters
+  const phi1 = lat1 * Math.PI / 180;
+  const phi2 = lat2 * Math.PI / 180;
+  const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+  const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // distance in meters
+}
+
+// 5. Get/Auto-Generate Teacher Schedules
+router.get('/teacher/schedule', authenticateJWT, requireTeacherOrAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Find if a schedule already exists for today
+    let schedule = await prisma.teacherSchedule.findFirst({
+      where: { userId, date: todayStr },
+    });
+
+    // Auto-generate one active class schedule if none exists to facilitate instant testing
+    if (!schedule) {
+      const now = new Date();
+      const isAdmin = req.user?.role === 'ADMIN';
+      
+      let title = 'Advanced Calculus Batch A';
+      let startTimeStr = '';
+      let endTimeStr = '';
+
+      if (isAdmin) {
+        title = 'Administrative Duty Shift';
+        startTimeStr = '11:00';
+        endTimeStr = '21:00';
+      } else {
+        // Class starts 1 hour ago and ends 2 hours from now
+        const start = new Date(now.getTime() - 60 * 60 * 1000);
+        const end = new Date(now.getTime() + 120 * 60 * 1000);
+        startTimeStr = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+        endTimeStr = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
+      }
+
+      schedule = await prisma.teacherSchedule.create({
+        data: {
+          userId,
+          title,
+          date: todayStr,
+          startTime: startTimeStr,
+          endTime: endTimeStr,
+        },
+      });
+    }
+
+    // Retrieve all schedules
+    const schedules = await prisma.teacherSchedule.findMany({
+      where: { userId },
+      orderBy: { date: 'desc' },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: schedules,
+    });
+  } catch (error: any) {
+    console.error('[Get Teacher Schedules Error]', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 6. Log Location Ping for Geofencing Check
+router.post('/teacher/ping', authenticateJWT, requireTeacherOrAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { latitude, longitude, scheduleId } = req.body;
+
+    if (latitude === undefined || longitude === undefined || !scheduleId) {
+      return res.status(400).json({ success: false, error: 'latitude, longitude, and scheduleId are required.' });
+    }
+
+    const schedule = await prisma.teacherSchedule.findUnique({
+      where: { id: scheduleId },
+    });
+
+    if (!schedule || schedule.userId !== userId) {
+      return res.status(404).json({ success: false, error: 'Valid schedule not found.' });
+    }
+
+    // Calculate distance
+    const distance = calculateHaversineDistance(latitude, longitude, INST_LAT, INST_LON);
+    const isInside = distance <= GEOFENCE_RADIUS_METERS;
+
+    // Log the ping
+    const log = await prisma.teacherLocationLog.create({
+      data: {
+        userId,
+        scheduleId,
+        latitude,
+        longitude,
+        distance,
+        isInside,
+      },
+    });
+
+    console.log(`[Geofence Ping] User ${userId} pinged lat:${latitude}, lon:${longitude} - Dist: ${distance.toFixed(1)}m | Inside: ${isInside}`);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        isInside,
+        distance,
+        timestamp: log.timestamp,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Teacher Location Ping Error]', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 7. Teacher Checkout & Attendance Verdict calculation
+router.post('/teacher/checkout', authenticateJWT, requireTeacherOrAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { scheduleId } = req.body;
+
+    if (!scheduleId) {
+      return res.status(400).json({ success: false, error: 'scheduleId is required.' });
+    }
+
+    const schedule = await prisma.teacherSchedule.findUnique({
+      where: { id: scheduleId },
+    });
+
+    if (!schedule || schedule.userId !== userId) {
+      return res.status(404).json({ success: false, error: 'Schedule record not found.' });
+    }
+
+    // Fetch all logs
+    const logs = await prisma.teacherLocationLog.findMany({
+      where: { scheduleId },
+    });
+
+    const totalPings = logs.length;
+    const insidePings = logs.filter(l => l.isInside).length;
+    const presenceRatio = totalPings > 0 ? insidePings / totalPings : 0;
+
+    let status = 'ABSENT';
+    if (presenceRatio >= 0.8) {
+      status = 'PRESENT';
+    } else if (presenceRatio >= 0.2) {
+      status = 'PARTIAL';
+    }
+
+    // Check if attendance already recorded
+    const existingAttendance = await prisma.teacherAttendance.findFirst({
+      where: { scheduleId },
+    });
+
+    let attendance;
+    if (existingAttendance) {
+      attendance = await prisma.teacherAttendance.update({
+        where: { id: existingAttendance.id },
+        data: {
+          status,
+          presenceRatio,
+          totalPings,
+          insidePings,
+        },
+      });
+    } else {
+      attendance = await prisma.teacherAttendance.create({
+        data: {
+          userId,
+          scheduleId,
+          date: schedule.date,
+          status,
+          presenceRatio,
+          totalPings,
+          insidePings,
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        message: 'Checkout completed successfully.',
+        attendance,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Teacher Checkout Error]', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 8. Get Geotagged Attendance History
+router.get('/teacher/attendance', authenticateJWT, requireTeacherOrAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const attendance = await prisma.teacherAttendance.findMany({
+      where: { userId },
+      include: {
+        schedule: true,
+      },
+      orderBy: { date: 'desc' },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: attendance,
+    });
+  } catch (error: any) {
+    console.error('[Get Teacher Attendance History Error]', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 export default router;

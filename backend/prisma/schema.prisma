@@ -23,6 +23,10 @@ model User {
   results         Result[]
   notifications   Notification[]
   attendance      Attendance[]
+  feePayments     FeePayment[]
+  teacherSchedules    TeacherSchedule[]
+  teacherLocationLogs TeacherLocationLog[]
+  teacherAttendances  TeacherAttendance[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -211,4 +215,80 @@ model Attendance {
   @@unique([userId, date])
   @@index([userId])
   @@index([date])
+}
+
+model FeePayment {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month             String    // Format: YYYY-MM
+  amount            Int       // Base fee in Paisa
+  fine              Int       // Fine in Paisa
+  totalAmount       Int       // amount + fine in Paisa
+  status            String    // "PENDING", "SUCCESS", "FAILED"
+  razorpayOrderId   String?   @unique
+  razorpayPaymentId String?
+  paidAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model TeacherSchedule {
+  id                  String               @id @default(uuid())
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title               String               // e.g. "Mathematics batch A"
+  date                String               // Format: YYYY-MM-DD
+  startTime           String               // Format: HH:MM
+  endTime             String               // Format: HH:MM
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  teacherLocationLogs TeacherLocationLog[]
+  teacherAttendances  TeacherAttendance[]
+
+  @@index([userId])
+}
+
+model TeacherLocationLog {
+  id         String          @id @default(uuid())
+  userId     String
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scheduleId String
+  schedule   TeacherSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  latitude   Float
+  longitude  Float
+  distance   Float           // distance from institute in meters
+  isInside   Boolean         // inside 20m radius
+  timestamp  DateTime        @default(now())
+
+  @@index([userId])
+  @@index([scheduleId])
+}
+
+model TeacherAttendance {
+  id            String          @id @default(uuid())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scheduleId    String
+  schedule      TeacherSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  date          String          // Format: YYYY-MM-DD
+  status        String          // "PRESENT", "PARTIAL", "ABSENT"
+  presenceRatio Float           // fraction of inside pings vs total pings
+  totalPings    Int
+  insidePings   Int
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([scheduleId])
+}
+
+model DailyReport {
+  id        String   @id @default(uuid())
+  title     String
+  date      String   @unique // Format: YYYY-MM-DD
+  pdfUrl    String   // Relative URL, e.g. "/uploads/reports/attendance-2026-06-22.pdf"
+  createdAt DateTime @default(now())
 }

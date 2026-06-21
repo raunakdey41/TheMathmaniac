@@ -21,6 +21,10 @@ router.get('/', auth_1.authenticateJWT, async (req, res) => {
                 name: true,
                 email: true,
                 role: true,
+                stream: true,
+                class: true,
+                faculty: true,
+                school: true,
                 createdAt: true,
             },
         });
@@ -32,30 +36,48 @@ router.get('/', auth_1.authenticateJWT, async (req, res) => {
             phoneNumber: req.user?.phoneNumber || '',
         };
         // Performance numbers
-        const totalPurchased = await db_1.default.purchase.count({
-            where: { userId, status: 'SUCCESS' },
-        });
-        const completedProgress = await db_1.default.lectureProgress.count({
-            where: { userId, completed: true },
-        });
-        const testResults = await db_1.default.result.findMany({
-            where: { userId },
-            select: { score: true, accuracy: true, test: { select: { totalMarks: true } } },
-        });
-        const totalTestsAttempted = testResults.length;
-        const averageAccuracy = totalTestsAttempted > 0
-            ? testResults.reduce((acc, row) => acc + row.accuracy, 0) / totalTestsAttempted
-            : 0;
+        let stats = {};
+        if (user.role === 'TEACHER' || user.role === 'ADMIN') {
+            const totalStudents = await db_1.default.user.count({
+                where: { role: 'STUDENT' },
+            });
+            const totalCourses = await db_1.default.course.count();
+            const totalTests = await db_1.default.test.count();
+            const totalMaterials = await db_1.default.studyMaterial.count();
+            stats = {
+                totalStudents,
+                totalCourses,
+                totalTests,
+                totalMaterials,
+            };
+        }
+        else {
+            const totalPurchased = await db_1.default.purchase.count({
+                where: { userId, status: 'SUCCESS' },
+            });
+            const completedProgress = await db_1.default.lectureProgress.count({
+                where: { userId, completed: true },
+            });
+            const testResults = await db_1.default.result.findMany({
+                where: { userId },
+                select: { score: true, accuracy: true, test: { select: { totalMarks: true } } },
+            });
+            const totalTestsAttempted = testResults.length;
+            const averageAccuracy = totalTestsAttempted > 0
+                ? testResults.reduce((acc, row) => acc + row.accuracy, 0) / totalTestsAttempted
+                : 0;
+            stats = {
+                purchasedCoursesCount: totalPurchased,
+                completedLecturesCount: completedProgress,
+                testsAttemptedCount: totalTestsAttempted,
+                averageTestAccuracy: Math.round(averageAccuracy),
+            };
+        }
         return res.status(200).json({
             success: true,
             data: {
                 profile: userWithPhone,
-                stats: {
-                    purchasedCoursesCount: totalPurchased,
-                    completedLecturesCount: completedProgress,
-                    testsAttemptedCount: totalTestsAttempted,
-                    averageTestAccuracy: Math.round(averageAccuracy),
-                },
+                stats,
             },
         });
     }

@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useAuthStore } from '../../../core/store/auth';
 import { apiClient } from '../../../core/api/client';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../../navigation/types';
+
+type TeacherHomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'TeacherAttendanceTracking' | 'SuperuserReports'>;
+
+const SUPERUSER_PHONES = ['+917980357754', '+919831754957'];
 
 export const TeacherHomeScreen: React.FC = () => {
   const { user } = useAuthStore();
+  const navigation = useNavigation<TeacherHomeScreenNavigationProp>();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<{
@@ -13,6 +21,8 @@ export const TeacherHomeScreen: React.FC = () => {
     totalTests: number;
     totalMaterials: number;
   } | null>(null);
+
+  const isSuperuser = user && SUPERUSER_PHONES.includes(user.phoneNumber);
 
   const loadStats = async () => {
     try {
@@ -77,6 +87,51 @@ export const TeacherHomeScreen: React.FC = () => {
                 Access and manage your courses, study materials, tests, and attendance tracking dynamically.
               </Text>
             </View>
+
+            {/* Geofenced Attendance Card */}
+            <View className="bg-slate-900 border border-slate-800 rounded-3xl p-5 mb-6">
+              <View className="flex-row justify-between items-center">
+                <View className="flex-1 mr-4">
+                  <Text className="text-slate-100 text-sm font-bold">📍 Geofenced Attendance</Text>
+                  <Text className="text-slate-500 text-[10px] mt-1 leading-4 font-semibold">
+                    Clock in, track distance status, and log attendance matching your active schedules.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('TeacherAttendanceTracking')}
+                  className="bg-[#2D8C82] border border-[#3CA79B] px-4 py-2.5 rounded-2xl active:opacity-90 shadow-md shadow-teal-500/10"
+                >
+                  <Text className="text-white text-xs font-extrabold uppercase tracking-wider">Start Tracking</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Superuser Controls Card */}
+            {isSuperuser && (
+              <View className="bg-slate-900 border border-amber-500/30 rounded-3xl p-5 mb-6">
+                <View className="flex-row justify-between items-center">
+                  <View className="flex-1 mr-4">
+                    <View className="flex-row items-center">
+                      <View className="bg-amber-500/10 px-2 py-0.5 rounded-full mr-2">
+                        <Text className="text-amber-400 text-[9px] font-extrabold uppercase tracking-widest">
+                          Superuser
+                        </Text>
+                      </View>
+                      <Text className="text-slate-100 text-sm font-bold">🔑 System Reports</Text>
+                    </View>
+                    <Text className="text-slate-500 text-[10px] mt-2 leading-4 font-semibold">
+                      Access cryptographic daily attendance logs, view generated PDFs, and force system compilation.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('SuperuserReports')}
+                    className="bg-amber-500 border border-amber-600 px-4 py-2.5 rounded-2xl active:opacity-90 shadow-md shadow-amber-500/10"
+                  >
+                    <Text className="text-slate-950 text-xs font-extrabold uppercase tracking-wider">View Reports</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
             {/* Quick Statistics Grid */}
             <Text className="text-slate-100 text-base font-bold mb-3">Academic Stats Overview</Text>

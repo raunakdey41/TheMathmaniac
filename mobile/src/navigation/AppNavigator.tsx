@@ -28,6 +28,8 @@ import { TestInstructionsScreen } from '../features/tests/screens/TestInstructio
 import { ActiveTestScreen } from '../features/tests/screens/ActiveTestScreen';
 import { TestResultScreen } from '../features/tests/screens/TestResultScreen';
 import { ProfileHomeScreen } from '../features/profile/screens/ProfileHomeScreen';
+import { FeePaymentScreen } from '../features/profile/screens/FeePaymentScreen';
+import { FeePaymentCheckoutScreen } from '../features/profile/screens/FeePaymentCheckoutScreen';
 
 // Teacher Screens imports
 import { TeacherHomeScreen } from '../features/teacher/screens/TeacherHomeScreen';
@@ -35,6 +37,8 @@ import { TeacherCoursesScreen } from '../features/teacher/screens/TeacherCourses
 import { TeacherTestsScreen } from '../features/teacher/screens/TeacherTestsScreen';
 import { TeacherMaterialsScreen } from '../features/teacher/screens/TeacherMaterialsScreen';
 import { TeacherProfileScreen } from '../features/teacher/screens/TeacherProfileScreen';
+import { TeacherAttendanceScreen } from '../features/teacher/screens/TeacherAttendanceScreen';
+import { SuperuserReportsScreen } from '../features/teacher/screens/SuperuserReportsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<AppTabsParamList>();
@@ -184,6 +188,10 @@ export const AppNavigator = () => {
         <Stack.Screen name="TestInstructions" component={TestInstructionsScreen} />
         <Stack.Screen name="ActiveTest" component={ActiveTestScreen} />
         <Stack.Screen name="TestResult" component={TestResultScreen} />
+        <Stack.Screen name="FeePayment" component={FeePaymentScreen} />
+        <Stack.Screen name="FeePaymentCheckout" component={FeePaymentCheckoutScreen} />
+        <Stack.Screen name="TeacherAttendanceTracking" component={TeacherAttendanceScreen} />
+        <Stack.Screen name="SuperuserReports" component={SuperuserReportsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -266,6 +266,24 @@ export const AdminPanelScreen: React.FC = () => {
         )}
       </View>
 
+      {/* Geotagged Attendance Tracker Action Banner for Admin */}
+      <View className="bg-slate-900 border border-slate-800 rounded-3xl p-5 mb-6">
+        <View className="flex-row justify-between items-center">
+          <View className="flex-1 mr-4">
+            <Text className="text-slate-100 text-sm font-bold">📍 Geofenced Attendance</Text>
+            <Text className="text-slate-500 text-[10px] mt-1 font-semibold leading-4">
+              Clock in and track your duty shift hours (11:00 AM - 09:00 PM) matching the geofence boundary.
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('TeacherAttendanceTracking')}
+            className="bg-[#2D8C82] border border-[#3CA79B] px-4 py-2.5 rounded-2xl active:opacity-90 shadow-md shadow-teal-500/10"
+          >
+            <Text className="text-white text-xs font-extrabold uppercase tracking-wider">Start Tracking</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Tabs */}
       <View className="flex-row bg-slate-900 p-1.5 rounded-2xl mb-6 border border-slate-800">
         <TouchableOpacity

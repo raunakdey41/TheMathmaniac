@@ -49,11 +49,16 @@ const materials_1 = __importDefault(require("./routes/materials"));
 const tests_1 = __importDefault(require("./routes/tests"));
 const payments_1 = __importDefault(require("./routes/payments"));
 const profile_1 = __importDefault(require("./routes/profile"));
+const attendance_1 = __importDefault(require("./routes/attendance"));
+const superuser_1 = __importDefault(require("./routes/superuser"));
 const firestoreListener_1 = require("./services/firestoreListener");
+const scheduler_1 = require("./services/scheduler");
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
 // Start Firestore real-time sync listener
 (0, firestoreListener_1.startFirestoreListener)();
+// Start Daily Cron Scheduler
+(0, scheduler_1.startScheduler)();
 // Middleware configurations
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -76,6 +81,8 @@ app.use('/api/v1/materials', materials_1.default);
 app.use('/api/v1/tests', tests_1.default);
 app.use('/api/v1/payments', payments_1.default);
 app.use('/api/v1/profile', profile_1.default);
+app.use('/api/v1/attendance', attendance_1.default);
+app.use('/api/v1/superuser', superuser_1.default);
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
