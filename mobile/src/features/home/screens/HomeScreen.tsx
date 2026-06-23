@@ -263,7 +263,6 @@ export const HomeScreen: React.FC = () => {
                     category={course.category.name}
                     price={course.price}
                     thumbnailUrl={course.thumbnailUrl}
-                    instructorName={course.instructorName}
                     lectureCount={course.lectureCount}
                     isPurchased={course.isPurchased}
                     onPress={() => navigation.navigate('CourseDetails', { courseId: course.id })}

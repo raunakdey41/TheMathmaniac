@@ -25,6 +25,16 @@ interface ScheduleRecord {
   date: string;
   startTime: string;
   endTime: string;
+  class?: string;
+  subject?: string;
+  user?: {
+    name: string;
+  };
+  campus: string;
+  campusCoords?: {
+    lat: number;
+    lon: number;
+  };
 }
 
 interface AttendanceRecord {
@@ -75,9 +85,9 @@ export const TeacherAttendanceScreen: React.FC = () => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLoggingRef = useRef(false);
 
-  // Constants
-  const INST_LAT = 22.5726;
-  const INST_LON = 88.3639;
+  // Constants (Fallback to Madhyamgram if schedule coords missing)
+  const FALLBACK_LAT = 22.693230336542225;
+  const FALLBACK_LON = 88.45923267330267;
   const GEOFENCE_RADIUS_METERS = 15;
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -101,7 +111,9 @@ export const TeacherAttendanceScreen: React.FC = () => {
         const fetchedSchedules = scheduleRes.data.data;
         setSchedules(fetchedSchedules);
         if (fetchedSchedules.length > 0) {
-          setActiveSchedule(fetchedSchedules[0]);
+          const todayStr = new Date().toISOString().split('T')[0];
+          const todaysSchedule = fetchedSchedules.find((s: any) => s.date === todayStr);
+          setActiveSchedule(todaysSchedule || null);
         }
       }
 
@@ -195,7 +207,10 @@ export const TeacherAttendanceScreen: React.FC = () => {
       const { latitude, longitude } = location.coords;
       setCurrentCoords({ latitude, longitude });
 
-      const dist = calculateDistance(latitude, longitude, INST_LAT, INST_LON);
+      const targetLat = activeSchedule.campusCoords?.lat ?? FALLBACK_LAT;
+      const targetLon = activeSchedule.campusCoords?.lon ?? FALLBACK_LON;
+
+      const dist = calculateDistance(latitude, longitude, targetLat, targetLon);
       const inside = dist <= GEOFENCE_RADIUS_METERS;
       setDistance(dist);
       setIsInside(inside);
@@ -386,6 +401,33 @@ export const TeacherAttendanceScreen: React.FC = () => {
                   <Text className="text-slate-100 text-base font-black">
                     {activeSchedule.title}
                   </Text>
+                  
+                  {activeSchedule.user && (
+                    <Text className="text-slate-300 text-xs mt-1.5 font-bold">
+                      👨‍🏫 Teacher: {activeSchedule.user.name}
+                    </Text>
+                  )}
+                  
+                  {activeSchedule.class && (
+                    <Text className="text-slate-300 text-xs mt-1">
+                      📚 Class: {activeSchedule.class}
+                    </Text>
+                  )}
+                  
+                  {activeSchedule.subject && (
+                    <Text className="text-slate-300 text-xs mt-1">
+                      📖 Subject: {activeSchedule.subject}
+                    </Text>
+                  )}
+
+                  <View className="flex-row items-center mt-1.5">
+                    <Text className="text-slate-400 text-xs">
+                      🏢 Campus: 
+                    </Text>
+                    <Text className="text-slate-200 text-xs font-bold ml-1">
+                      {activeSchedule.campus}
+                    </Text>
+                  </View>
                   <Text className="text-slate-400 text-xs mt-1.5">
                     📅 Date: {activeSchedule.date}
                   </Text>
@@ -418,7 +460,9 @@ export const TeacherAttendanceScreen: React.FC = () => {
                 <View className="space-y-2">
                   <View className="flex-row justify-between items-center">
                     <Text className="text-slate-500 text-xs font-semibold">Institute Center</Text>
-                    <Text className="text-slate-400 text-xs font-bold">{INST_LAT}, {INST_LON}</Text>
+                    <Text className="text-slate-400 text-xs font-bold">
+                      {activeSchedule?.campusCoords?.lat ?? FALLBACK_LAT}, {activeSchedule?.campusCoords?.lon ?? FALLBACK_LON}
+                    </Text>
                   </View>
                   <View className="flex-row justify-between items-center">
                     <Text className="text-slate-500 text-xs font-semibold">Current Coords</Text>
@@ -554,8 +598,43 @@ export const TeacherAttendanceScreen: React.FC = () => {
               </View>
             )}
 
+            {/* Upcoming / Future Schedules */}
+            <Text className="text-slate-100 text-base font-bold mb-3.5 mt-4">All Scheduled Routines</Text>
+            {schedules.length === 0 ? (
+              <View className="bg-slate-900 border border-slate-800 rounded-2xl p-6 items-center mb-5">
+                <Text className="text-slate-500 text-xs font-semibold">No assigned routines found.</Text>
+              </View>
+            ) : (
+              schedules.map((record) => (
+                <View
+                  key={record.id}
+                  className="bg-slate-900 border border-slate-800 rounded-3xl p-5 mb-3.5"
+                >
+                  <View className="flex-row justify-between items-start">
+                    <View className="flex-1 mr-4">
+                      <Text className="text-slate-100 text-sm font-bold">
+                        {record.title}
+                      </Text>
+                      <Text className="text-slate-500 text-[10px] mt-1 font-semibold">
+                        📅 Date: {record.date} | ⏱️ {record.startTime} - {record.endTime}
+                      </Text>
+                      {(record.class || record.subject) && (
+                        <Text className="text-slate-500 text-[10px] mt-0.5 font-semibold">
+                          {record.class ? `📚 Class: ${record.class} ` : ''}
+                          {record.subject ? `📖 Subject: ${record.subject}` : ''}
+                        </Text>
+                      )}
+                    </View>
+                    <View className="px-2.5 py-1 rounded-full border bg-blue-900/20 border-blue-500/30">
+                      <Text className="text-[9px] font-black uppercase tracking-wider text-blue-400">{record.campus}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
+
             {/* Completed Sessions Attendance History */}
-            <Text className="text-slate-100 text-base font-bold mb-3.5">Completed Sessions History</Text>
+            <Text className="text-slate-100 text-base font-bold mb-3.5 mt-4">Completed Attendance Logs</Text>
             {history.length === 0 ? (
               <View className="bg-slate-900 border border-slate-800 rounded-2xl p-6 items-center">
                 <Text className="text-slate-500 text-xs font-semibold">No attendance log history found.</Text>

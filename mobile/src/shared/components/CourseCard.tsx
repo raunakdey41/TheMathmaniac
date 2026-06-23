@@ -8,7 +8,6 @@ interface CourseCardProps {
   category: string;
   price: number;
   thumbnailUrl: string;
-  instructorName: string;
   lectureCount: number;
   isPurchased?: boolean;
   onPress: () => void;
@@ -21,7 +20,6 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   category,
   price,
   thumbnailUrl,
-  instructorName,
   lectureCount,
   isPurchased = false,
   onPress,
@@ -56,7 +54,6 @@ export const CourseCard: React.FC<CourseCardProps> = ({
               <Text className="text-sm font-semibold text-white mt-1" numberOfLines={2}>
                 {title}
               </Text>
-              <Text className="text-xs text-neutral-300 mt-1">by {instructorName}</Text>
             </View>
             <View className="flex-row justify-between items-center mt-2">
               <Text className="text-xs text-neutral-300">{lectureCount} Lectures</Text>
@@ -99,7 +96,6 @@ export const CourseCard: React.FC<CourseCardProps> = ({
             <Text className="text-base font-semibold text-white mt-2" numberOfLines={2}>
               {title}
             </Text>
-            <Text className="text-xs text-neutral-300 mt-1">by {instructorName}</Text>
           </View>
 
           <View className="flex-row justify-between items-center mt-4 pt-3 border-t border-white/10">

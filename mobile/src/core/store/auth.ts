@@ -42,6 +42,7 @@ interface AuthState {
   adminAssignTeacher: (courseId: string, teacherId: string) => Promise<boolean>;
   adminRemoveTeacher: (courseId: string, teacherId: string) => Promise<boolean>;
   adminCreateCourse: (data: any) => Promise<boolean>;
+  adminDeleteCourse: (courseId: string) => Promise<boolean>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -328,6 +329,19 @@ export const useAuthStore = create<AuthState>((set) => ({
       return true;
     } catch (error: any) {
       const msg = error.response?.data?.error || error.message || 'Failed to create course';
+      set({ error: msg, isLoading: false });
+      return false;
+    }
+  },
+
+  adminDeleteCourse: async (courseId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await apiClient.delete(`/admin/courses/${courseId}`);
+      set({ isLoading: false });
+      return true;
+    } catch (error: any) {
+      const msg = error.response?.data?.error || error.message || 'Failed to delete course';
       set({ error: msg, isLoading: false });
       return false;
     }

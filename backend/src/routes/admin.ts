@@ -381,8 +381,13 @@ router.post('/courses/:id/enroll', authenticateJWT, requireAdmin, async (req: Au
       return res.status(400).json({ success: false, error: 'Student is already enrolled in this course.' });
     }
 
-    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    const course = await prisma.course.findUnique({ 
+      where: { id: courseId },
+      include: { bundleItems: true }
+    });
     if (!course) return res.status(404).json({ success: false, error: 'Course not found.' });
+
+    const orderId = `manual_admin_${Date.now()}_${studentId.substring(0,5)}`;
 
     await prisma.purchase.create({
       data: {
@@ -390,9 +395,29 @@ router.post('/courses/:id/enroll', authenticateJWT, requireAdmin, async (req: Au
         courseId,
         amount: course.price,
         status: 'SUCCESS',
-        razorpayOrderId: `manual_admin_${Date.now()}_${studentId.substring(0,5)}`
+        razorpayOrderId: orderId
       }
     });
+
+    if (course.isBundle && course.bundleItems && course.bundleItems.length > 0) {
+      const subPurchases = course.bundleItems.map((item: any) => ({
+        userId: studentId,
+        courseId: item.courseId,
+        amount: 0,
+        status: 'SUCCESS',
+        razorpayOrderId: `bundle_auto_${orderId.substring(0, 10)}_${item.courseId.substring(0, 8)}`,
+      }));
+      
+      const existingSubPurchases = await prisma.purchase.findMany({
+        where: { userId: studentId, courseId: { in: course.bundleItems.map((i: any) => i.courseId) } }
+      });
+      const existingCourseIds = existingSubPurchases.map((p: any) => p.courseId);
+      
+      const newSubPurchases = subPurchases.filter((p: any) => !existingCourseIds.includes(p.courseId));
+      if (newSubPurchases.length > 0) {
+        await prisma.purchase.createMany({ data: newSubPurchases });
+      }
+    }
 
     // Write to AuditLog
     await prisma.auditLog.create({
@@ -469,10 +494,19 @@ router.post('/courses', authenticateJWT, requireAdmin, async (req: Authenticated
       return res.status(403).json({ success: false, error: 'Access Denied: Only authorized superusers can create courses.' });
     }
 
-    const { title, description, thumbnailUrl, price, categoryId, instructorName, learningOutcomes } = req.body;
+    const { title, description, thumbnailUrl, price, categoryId, learningOutcomes, timeSlots, branch, targetClass, isBundle, bundleCourseIds } = req.body;
 
-    if (!title || !description || price === undefined || !categoryId || !instructorName) {
-      return res.status(400).json({ success: false, error: 'Missing required course fields.' });
+    if (!title || !description || price === undefined) {
+      return res.status(400).json({ success: false, error: 'Missing required course fields (title, description, price).' });
+    }
+
+    let finalCategoryId = categoryId;
+    if (!finalCategoryId || finalCategoryId.trim() === '') {
+      let genCat = await prisma.courseCategory.findFirst({ where: { slug: 'general' } });
+      if (!genCat) {
+        genCat = await prisma.courseCategory.create({ data: { name: 'General', slug: 'general' } });
+      }
+      finalCategoryId = genCat.id;
     }
 
     const course = await prisma.course.create({
@@ -481,10 +515,18 @@ router.post('/courses', authenticateJWT, requireAdmin, async (req: Authenticated
         description: description.trim(),
         thumbnailUrl: thumbnailUrl?.trim() || '',
         price: Number(price),
-        categoryId: categoryId.trim(),
-        instructorName: instructorName.trim(),
+        categoryId: finalCategoryId.trim(),
         learningOutcomes: learningOutcomes || '[]',
+        timeSlots: timeSlots ? JSON.stringify(timeSlots) : '[]',
+        branch: branch || 'Sodepur',
+        targetClass: targetClass || null,
         published: true,
+        isBundle: !!isBundle,
+        bundleItems: isBundle && Array.isArray(bundleCourseIds) ? {
+          create: bundleCourseIds.map((cid: string) => ({
+            courseId: cid
+          }))
+        } : undefined
       }
     });
 
@@ -502,6 +544,31 @@ router.post('/courses', authenticateJWT, requireAdmin, async (req: Authenticated
   } catch (error: any) {
     console.error('[Create Course Error]', error);
     return res.status(500).json({ success: false, error: error.message || 'Failed to create course.' });
+  }
+});
+
+// Delete course (Superusers only)
+router.delete('/courses/:id', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.phoneNumber !== '+917980357754' && req.user?.phoneNumber !== '+919831754957') {
+      return res.status(403).json({ success: false, error: 'Access Denied: Only authorized superusers can delete courses.' });
+    }
+
+    const { id } = req.params;
+
+    // Delete associated records first (cascade deletes could also be configured in Prisma)
+    await prisma.courseTeacher.deleteMany({ where: { courseId: id } });
+    await prisma.purchase.deleteMany({ where: { courseId: id } });
+    await prisma.lecture.deleteMany({ where: { courseId: id } });
+    await prisma.test.deleteMany({ where: { courseId: id } });
+    await prisma.studyMaterial.deleteMany({ where: { courseId: id } });
+
+    await prisma.course.delete({ where: { id } });
+
+    res.json({ success: true, message: 'Course deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting course:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
 

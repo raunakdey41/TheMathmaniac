@@ -1,23 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, TextInput, ActivityIndicator } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { apiClient } from '../../../core/api/client';
 import { useAuthStore } from '../../../core/store/auth';
 
 const SUPERUSER_PHONES = ['+917980357754', '+919831754957'];
 
 export const AdminCoursesTab: React.FC = () => {
-  const { user, adminListCourses, adminEnrollStudent, adminAssignTeacher, adminRemoveTeacher, isLoading } = useAuthStore();
+  const { user, adminListCourses, adminEnrollStudent, adminAssignTeacher, adminRemoveTeacher, adminDeleteCourse, adminListUsers, isLoading } = useAuthStore();
   const [courses, setCourses] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [enrollStudentId, setEnrollStudentId] = useState('');
-  const [assignTeacherId, setAssignTeacherId] = useState('');
+  const [assignTeacherIds, setAssignTeacherIds] = useState<string[]>([]);
+  const [loadingActions, setLoadingActions] = useState({ assignTeacher: false });
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
   // Create Course Form State
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
-  const [newCourse, setNewCourse] = useState({
-    title: '', description: '', thumbnailUrl: '', price: '', categoryId: '', instructorName: ''
+  const [newCourse, setNewCourse] = useState<{
+    title: string; description: string; thumbnailUrl: string; price: string; categoryId: string; branch: string; targetClass: string; timeSlots: any[];
+    isBundle: boolean; bundleCourseIds: string[];
+  }>({
+    title: '', description: '', thumbnailUrl: '', price: '', categoryId: '', branch: 'Sodepur', targetClass: '', timeSlots: [], isBundle: false, bundleCourseIds: []
   });
+
+  const [slotDay, setSlotDay] = useState('Mon');
+  const [slotTime, setSlotTime] = useState('');
+
+  const handleAddSlot = () => {
+    if (!slotTime.trim()) return;
+    setNewCourse(prev => ({
+      ...prev,
+      timeSlots: [...prev.timeSlots, { day: slotDay, time: slotTime.trim() }]
+    }));
+    setSlotTime('');
+  };
+
+  const handleRemoveSlot = (idx: number) => {
+    setNewCourse(prev => ({
+      ...prev,
+      timeSlots: prev.timeSlots.filter((_, i) => i !== idx)
+    }));
+  };
 
   const isSuperuser = user && SUPERUSER_PHONES.includes(user.phoneNumber);
   const isCourseCreator = user && user.phoneNumber?.includes('9831754957');
@@ -27,8 +54,16 @@ export const AdminCoursesTab: React.FC = () => {
     setCourses(data);
   };
 
+  const loadAllUsers = async () => {
+    const st = await adminListUsers('', 'STUDENT');
+    const te = await adminListUsers('', 'TEACHER');
+    setStudents(st);
+    setTeachers(te);
+  };
+
   useEffect(() => {
     loadCourses();
+    loadAllUsers();
     if (isCourseCreator) {
       apiClient.get('/courses/categories').then(res => {
         if (res.data.success) {
@@ -41,18 +76,33 @@ export const AdminCoursesTab: React.FC = () => {
     }
   }, []);
 
+  const handlePickThumbnail = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: 'image/*' });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setNewCourse({ ...newCourse, thumbnailUrl: result.assets[0].uri });
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
   const handleCreateCourse = async () => {
-    if (!newCourse.title || !newCourse.description || !newCourse.price || !newCourse.categoryId || !newCourse.instructorName) {
+    if (!newCourse.title || !newCourse.description || !newCourse.price) {
       Alert.alert('Error', 'Please fill in all required fields.');
       return;
     }
     const success = await useAuthStore.getState().adminCreateCourse({
       ...newCourse,
-      price: parseInt(newCourse.price, 10)
+      price: parseInt(newCourse.price, 10) * 100, // Convert Rs to Paisa
+      timeSlots: newCourse.timeSlots,
+      branch: newCourse.branch,
+      targetClass: newCourse.targetClass
     });
     if (success) {
       Alert.alert('Success', 'Course created successfully.');
-      setNewCourse({ title: '', description: '', thumbnailUrl: '', price: '', categoryId: categories[0]?.id || '', instructorName: '' });
+      setNewCourse({ title: '', description: '', thumbnailUrl: '', price: '', categoryId: categories[0]?.id || '', branch: 'Sodepur', targetClass: '', timeSlots: [], isBundle: false, bundleCourseIds: [] });
       setShowCreateForm(false);
       loadCourses();
     } else {
@@ -77,18 +127,23 @@ export const AdminCoursesTab: React.FC = () => {
   };
 
   const handleAssignTeacher = async (courseId: string) => {
-    if (!assignTeacherId.trim()) {
-      Alert.alert('Input Error', 'Please enter a Teacher ID.');
+    if (assignTeacherIds.length === 0) {
+      Alert.alert('Error', 'Please select at least one teacher to assign.');
       return;
     }
-    const success = await adminAssignTeacher(courseId, assignTeacherId.trim());
-    if (success) {
-      Alert.alert('Success', 'Teacher assigned successfully.');
-      setAssignTeacherId('');
+    setLoadingActions(prev => ({ ...prev, assignTeacher: true }));
+    let successCount = 0;
+    for (const tid of assignTeacherIds) {
+      const success = await adminAssignTeacher(courseId, tid);
+      if (success) successCount++;
+    }
+    setLoadingActions(prev => ({ ...prev, assignTeacher: false }));
+    if (successCount > 0) {
+      Alert.alert('Success', `Successfully assigned ${successCount} teacher(s).`);
+      setAssignTeacherIds([]);
       loadCourses();
     } else {
-      const errorMsg = useAuthStore.getState().error || 'Failed to assign teacher.';
-      Alert.alert('Error', errorMsg);
+      Alert.alert('Error', 'Failed to assign teachers.');
     }
   };
 
@@ -112,6 +167,25 @@ export const AdminCoursesTab: React.FC = () => {
     ]);
   };
 
+  const handleDeleteCourse = (courseId: string) => {
+    Alert.alert('Confirm Delete', 'Are you sure you want to permanently remove this course? This will remove all enrollments and materials.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const success = await adminDeleteCourse(courseId);
+          if (success) {
+            Alert.alert('Success', 'Course deleted successfully.');
+            loadCourses();
+          } else {
+            Alert.alert('Error', useAuthStore.getState().error || 'Failed to delete course.');
+          }
+        }
+      }
+    ]);
+  };
+
   if (isLoading && courses.length === 0) {
     return (
       <View className="items-center py-20">
@@ -121,7 +195,7 @@ export const AdminCoursesTab: React.FC = () => {
   }
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 pb-10">
+    <ScrollView showsVerticalScrollIndicator={false} className="flex-1" contentContainerStyle={{ paddingBottom: 300 }}>
       {/* Create Course Section (Shubhadeep Biswas Only) */}
       {isCourseCreator && (
         <View className="mb-6">
@@ -136,31 +210,142 @@ export const AdminCoursesTab: React.FC = () => {
             <View className="bg-slate-900 border border-slate-800 rounded-3xl p-5 mt-4">
               <Text className="text-slate-100 text-sm font-bold mb-4">Course Details</Text>
               
+              <View className="flex-row items-center justify-between mb-4 mt-2">
+                <Text className="text-slate-400 text-[10px] font-bold uppercase">Is this a Bundle / Batch?</Text>
+                <TouchableOpacity 
+                  onPress={() => setNewCourse({...newCourse, isBundle: !newCourse.isBundle})}
+                  className={`w-12 h-6 rounded-full justify-center px-1 ${newCourse.isBundle ? 'bg-blue-600' : 'bg-slate-700'}`}
+                >
+                  <View className={`w-4 h-4 rounded-full bg-white transition-all ${newCourse.isBundle ? 'ml-auto' : ''}`} />
+                </TouchableOpacity>
+              </View>
+
               <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Title</Text>
               <TextInput className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs mb-3" placeholder="Course Title" placeholderTextColor="#5C5446" value={newCourse.title} onChangeText={(t) => setNewCourse({...newCourse, title: t})} />
 
+              {!newCourse.isBundle ? (
+                <View className="mb-4">
+                  <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Timings & Time Slots</Text>
+                  <View className="bg-slate-950 border border-slate-800 rounded-xl p-3">
+                    <View className="flex-row mb-3">
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => (
+                          <TouchableOpacity 
+                            key={day} 
+                            onPress={() => setSlotDay(day)}
+                            className={`px-3 py-1.5 rounded-lg mr-2 ${slotDay === day ? 'bg-blue-600' : 'bg-slate-800'}`}
+                          >
+                            <Text className={`text-xs font-bold ${slotDay === day ? 'text-white' : 'text-slate-400'}`}>{day}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                    <View className="flex-row">
+                      <TextInput className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-xs mr-2" placeholder="e.g. 10:00 AM" placeholderTextColor="#5C5446" value={slotTime} onChangeText={setSlotTime} />
+                      <TouchableOpacity onPress={handleAddSlot} className="bg-slate-700 px-4 justify-center rounded-lg">
+                        <Text className="text-white text-xs font-bold">Add</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {newCourse.timeSlots.length > 0 && (
+                      <View className="mt-3 flex-row flex-wrap gap-2">
+                        {newCourse.timeSlots.map((slot, idx) => (
+                          <View key={idx} className="bg-blue-900/50 border border-blue-500/30 px-2 py-1 rounded-md flex-row items-center">
+                            <Text className="text-blue-300 text-[10px] font-bold">{slot.day} {slot.time}</Text>
+                            <TouchableOpacity onPress={() => handleRemoveSlot(idx)} className="ml-2 bg-red-500/20 rounded-full w-4 h-4 items-center justify-center">
+                              <Text className="text-red-400 text-[8px] font-black">×</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ) : (
+                <View className="mb-4">
+                  <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Select Courses for Bundle</Text>
+                  <View style={{ maxHeight: 180 }} className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+                    <ScrollView nestedScrollEnabled className="p-2">
+                      {courses.filter(c => !c.isBundle).map(courseItem => {
+                        const isSelected = newCourse.bundleCourseIds.includes(courseItem.id);
+                        return (
+                          <TouchableOpacity 
+                            key={courseItem.id} 
+                            onPress={() => setNewCourse(prev => ({
+                              ...prev,
+                              bundleCourseIds: isSelected 
+                                ? prev.bundleCourseIds.filter(id => id !== courseItem.id) 
+                                : [...prev.bundleCourseIds, courseItem.id]
+                            }))}
+                            className={`p-3 rounded-lg border mb-1 flex-row justify-between items-center ${isSelected ? 'bg-blue-600/20 border-blue-500' : 'bg-slate-900 border-slate-800'}`}
+                          >
+                            <View>
+                              <Text className={`text-xs font-bold ${isSelected ? 'text-blue-400' : 'text-slate-200'}`}>{courseItem.title}</Text>
+                            </View>
+                            {isSelected && (
+                              <View className="bg-blue-500 rounded-full w-4 h-4 items-center justify-center">
+                                <Text className="text-white text-[9px] font-black">✓</Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                      {courses.filter(c => !c.isBundle).length === 0 && (
+                        <Text className="text-slate-500 text-xs text-center py-4">No regular courses available to bundle.</Text>
+                      )}
+                    </ScrollView>
+                  </View>
+                </View>
+              )}
+              
               <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Description</Text>
               <TextInput className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs mb-3" placeholder="Course Description" placeholderTextColor="#5C5446" value={newCourse.description} onChangeText={(t) => setNewCourse({...newCourse, description: t})} multiline />
 
-              <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Instructor Name</Text>
-              <TextInput className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs mb-3" placeholder="e.g. Prof. Smith" placeholderTextColor="#5C5446" value={newCourse.instructorName} onChangeText={(t) => setNewCourse({...newCourse, instructorName: t})} />
+              <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Price (in Rs)</Text>
+              <TextInput className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs mb-3" placeholder="e.g. 500" placeholderTextColor="#5C5446" value={newCourse.price} onChangeText={(t) => setNewCourse({...newCourse, price: t})} keyboardType="number-pad" />
 
-              <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Price (in Paisa)</Text>
-              <TextInput className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs mb-3" placeholder="e.g. 50000 (for Rs. 500)" placeholderTextColor="#5C5446" value={newCourse.price} onChangeText={(t) => setNewCourse({...newCourse, price: t})} keyboardType="number-pad" />
+              <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Target Class</Text>
+              <TextInput className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs mb-3" placeholder="e.g. 11th" placeholderTextColor="#5C5446" value={newCourse.targetClass} onChangeText={(t) => setNewCourse({...newCourse, targetClass: t})} />
 
-              <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Thumbnail URL (Optional)</Text>
-              <TextInput className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs mb-3" placeholder="https://..." placeholderTextColor="#5C5446" value={newCourse.thumbnailUrl} onChangeText={(t) => setNewCourse({...newCourse, thumbnailUrl: t})} />
-
-              <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Category</Text>
-              <View className="flex-row flex-wrap gap-2 mb-4">
-                {categories.map(cat => (
-                  <TouchableOpacity key={cat.id} onPress={() => setNewCourse({...newCourse, categoryId: cat.id})} className={`px-3 py-2 rounded-xl border ${newCourse.categoryId === cat.id ? 'bg-blue-600 border-blue-500' : 'bg-slate-950 border-slate-800'}`}>
-                    <Text className={`text-[10px] font-bold ${newCourse.categoryId === cat.id ? 'text-white' : 'text-slate-400'}`}>{cat.name}</Text>
+              <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Branch</Text>
+              <View className="flex-row gap-4 mb-3">
+                {['Sodepur', 'Madhyamgram'].map(b => (
+                  <TouchableOpacity
+                    key={b}
+                    onPress={() => setNewCourse({...newCourse, branch: b})}
+                    className={`px-4 py-2 rounded-xl border flex-1 items-center ${newCourse.branch === b ? 'bg-blue-600 border-blue-500' : 'bg-slate-950 border-slate-800'}`}
+                  >
+                    <Text className={`text-xs font-bold ${newCourse.branch === b ? 'text-white' : 'text-slate-400'}`}>{b}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <TouchableOpacity onPress={handleCreateCourse} className="bg-emerald-600 rounded-2xl py-3.5 items-center">
+
+              <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Course Image (Optional)</Text>
+              <TouchableOpacity 
+                onPress={handlePickThumbnail} 
+                className="bg-slate-950 border border-slate-800 border-dashed rounded-xl px-4 py-4 mb-3 items-center"
+              >
+                {newCourse.thumbnailUrl ? (
+                  <Text className="text-emerald-400 text-xs font-bold">Image Selected: {newCourse.thumbnailUrl.substring(newCourse.thumbnailUrl.lastIndexOf('/') + 1)}</Text>
+                ) : (
+                  <Text className="text-slate-400 text-xs font-bold">+ Upload Image</Text>
+                )}
+              </TouchableOpacity>
+
+              {categories.length > 0 && (
+                <View>
+                  <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Category</Text>
+                  <View className="flex-row flex-wrap gap-2 mb-4">
+                    {categories.map(cat => (
+                      <TouchableOpacity key={cat.id} onPress={() => setNewCourse({...newCourse, categoryId: cat.id})} className={`px-3 py-2 rounded-xl border ${newCourse.categoryId === cat.id ? 'bg-blue-600 border-blue-500' : 'bg-slate-950 border-slate-800'}`}>
+                        <Text className={`text-[10px] font-bold ${newCourse.categoryId === cat.id ? 'text-white' : 'text-slate-400'}`}>{cat.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              <TouchableOpacity onPress={handleCreateCourse} className="bg-emerald-600 rounded-2xl py-3.5 items-center mt-2">
                 <Text className="text-white text-xs font-bold uppercase tracking-wider">Publish Course</Text>
               </TouchableOpacity>
             </View>
@@ -238,44 +423,97 @@ export const AdminCoursesTab: React.FC = () => {
                 
                 {/* Enroll Student (Admins & Superusers) */}
                 <View className="mb-4">
-                  <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Enroll Student (Manual)</Text>
-                  <View className="flex-row items-center gap-2">
-                    <TextInput
-                      className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs"
-                      placeholder="Enter Student ID"
-                      placeholderTextColor="#5C5446"
-                      value={enrollStudentId}
-                      onChangeText={setEnrollStudentId}
-                    />
-                    <TouchableOpacity
-                      onPress={() => handleEnroll(course.id)}
-                      className="bg-[#2D8C82] px-4 py-3 rounded-xl"
-                    >
-                      <Text className="text-white text-[10px] font-bold uppercase tracking-wider">Enroll</Text>
-                    </TouchableOpacity>
+                  <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">
+                    Enroll Student {course.targetClass ? `(Class ${course.targetClass})` : '(All Classes)'}
+                  </Text>
+                  
+                  <View style={{ maxHeight: 160 }} className="bg-slate-950 border border-slate-800 rounded-xl mb-3 overflow-hidden">
+                    <ScrollView nestedScrollEnabled className="p-2">
+                      {students.filter(s => !course.targetClass || s.class === course.targetClass).map(student => (
+                        <TouchableOpacity 
+                          key={student.id} 
+                          onPress={() => setEnrollStudentId(student.id)}
+                          className={`p-3 rounded-lg border mb-1 flex-row justify-between items-center ${enrollStudentId === student.id ? 'bg-blue-600/20 border-blue-500' : 'bg-slate-900 border-slate-800'}`}
+                        >
+                          <View>
+                            <Text className={`text-xs font-bold ${enrollStudentId === student.id ? 'text-blue-400' : 'text-slate-200'}`}>{student.name}</Text>
+                            <Text className={`text-[10px] mt-0.5 ${enrollStudentId === student.id ? 'text-blue-300/70' : 'text-slate-500'}`}>
+                              {student.phoneNumber} {student.class ? `| Class ${student.class}` : ''}
+                            </Text>
+                          </View>
+                          {enrollStudentId === student.id && (
+                            <View className="bg-blue-500 rounded-full w-4 h-4 items-center justify-center">
+                              <Text className="text-white text-[9px] font-black">✓</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                      {students.filter(s => !course.targetClass || s.class === course.targetClass).length === 0 && (
+                        <Text className="text-slate-500 text-xs text-center py-4">No students found for this class.</Text>
+                      )}
+                    </ScrollView>
                   </View>
+
+                  <TouchableOpacity
+                    onPress={() => handleEnroll(course.id)}
+                    className="bg-[#2D8C82] py-3.5 rounded-xl items-center"
+                  >
+                    <Text className="text-white text-xs font-bold uppercase tracking-wider">Enroll Selected Student</Text>
+                  </TouchableOpacity>
                 </View>
 
                 {/* Assign Teacher (Superusers Only) */}
                 {isSuperuser && (
-                  <View>
+                  <View className="mb-4">
                     <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Assign Teacher</Text>
-                    <View className="flex-row items-center gap-2">
-                      <TextInput
-                        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs"
-                        placeholder="Enter Teacher ID"
-                        placeholderTextColor="#5C5446"
-                        value={assignTeacherId}
-                        onChangeText={setAssignTeacherId}
-                      />
-                      <TouchableOpacity
-                        onPress={() => handleAssignTeacher(course.id)}
-                        className="bg-purple-600 px-4 py-3 rounded-xl"
-                      >
-                        <Text className="text-white text-[10px] font-bold uppercase tracking-wider">Assign</Text>
-                      </TouchableOpacity>
+                    
+                    <View style={{ maxHeight: 160 }} className="bg-slate-950 border border-slate-800 rounded-xl mb-3 overflow-hidden">
+                      <ScrollView nestedScrollEnabled className="p-2">
+                        {teachers.map(teacher => {
+                          const isSelected = assignTeacherIds.includes(teacher.id);
+                          return (
+                            <TouchableOpacity 
+                              key={teacher.id} 
+                              onPress={() => setAssignTeacherIds(prev => isSelected ? prev.filter(id => id !== teacher.id) : [...prev, teacher.id])}
+                              className={`p-3 rounded-lg border mb-1 flex-row justify-between items-center ${isSelected ? 'bg-purple-600/20 border-purple-500' : 'bg-slate-900 border-slate-800'}`}
+                            >
+                              <View>
+                                <Text className={`text-xs font-bold ${isSelected ? 'text-purple-400' : 'text-slate-200'}`}>{teacher.name}</Text>
+                                <Text className={`text-[10px] mt-0.5 ${isSelected ? 'text-purple-300/70' : 'text-slate-500'}`}>
+                                  {teacher.phoneNumber} {teacher.subjects ? `| Subjects: ${teacher.subjects}` : ''}
+                                </Text>
+                              </View>
+                              {isSelected && (
+                                <View className="bg-purple-500 rounded-full w-4 h-4 items-center justify-center">
+                                  <Text className="text-white text-[9px] font-black">✓</Text>
+                                </View>
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                        {teachers.length === 0 && (
+                          <Text className="text-slate-500 text-xs text-center py-4">No teachers found.</Text>
+                        )}
+                      </ScrollView>
                     </View>
+
+                    <TouchableOpacity
+                      onPress={() => handleAssignTeacher(course.id)}
+                      className="bg-purple-600 py-3.5 rounded-xl items-center"
+                    >
+                      <Text className="text-white text-xs font-bold uppercase tracking-wider">Assign Selected Teachers</Text>
+                    </TouchableOpacity>
                   </View>
+                )}
+
+                {/* Delete Course (Superusers Only) */}
+                {isSuperuser && (
+                  <TouchableOpacity
+                    onPress={() => handleDeleteCourse(course.id)}
+                    className="bg-red-500/10 border border-red-500/20 py-3 rounded-xl items-center mt-2"
+                  >
+                    <Text className="text-red-400 text-xs font-bold uppercase tracking-wider">Delete Course</Text>
+                  </TouchableOpacity>
                 )}
 
               </View>

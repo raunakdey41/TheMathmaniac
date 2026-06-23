@@ -7,6 +7,7 @@ import { RootStackParamList } from '../../../navigation/types';
 import { useAuthStore } from '../../../core/store/auth';
 import { Button } from '../../../shared/components/Button';
 import { AdminCoursesTab } from './AdminCoursesTab';
+import { AdminRoutineTab } from './AdminRoutineTab';
 
 type AdminPanelScreenNavigationProp = StackNavigationProp<RootStackParamList, 'AdminPanel'>;
 
@@ -22,7 +23,7 @@ export const AdminPanelScreen: React.FC = () => {
     isLoading
   } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState<'directory' | 'create' | 'audit' | 'courses'>('directory');
+  const [activeTab, setActiveTab] = useState<'directory' | 'create' | 'audit' | 'courses' | 'routines'>('directory');
 
   // Directory State
   const [users, setUsers] = useState<any[]>([]);
@@ -328,6 +329,16 @@ export const AdminPanelScreen: React.FC = () => {
         >
           <Text className={`font-bold text-[10px] ${activeTab === 'courses' ? 'text-slate-100' : 'text-slate-400'}`}>
             Courses
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab('routines')}
+          className={`flex-1 py-3 rounded-xl items-center justify-center ${
+            activeTab === 'routines' ? 'bg-slate-800' : 'bg-transparent'
+          }`}
+        >
+          <Text className={`font-bold text-[10px] ${activeTab === 'routines' ? 'text-slate-100' : 'text-slate-400'}`}>
+            Routines
           </Text>
         </TouchableOpacity>
       </View>
@@ -682,7 +693,17 @@ export const AdminPanelScreen: React.FC = () => {
         </ScrollView>
       )}
 
-      {activeTab === 'courses' && <AdminCoursesTab />}
+      {activeTab === 'courses' && (
+        <View className="flex-1">
+          <AdminCoursesTab />
+        </View>
+      )}
+
+      {activeTab === 'routines' && (
+        <View className="flex-1">
+          <AdminRoutineTab />
+        </View>
+      )}
 
       {/* Generated Credentials Modal (Shown ONLY ONCE) */}
       <Modal visible={showCredsModal} transparent animationType="fade" onRequestClose={() => setShowCredsModal(false)}>

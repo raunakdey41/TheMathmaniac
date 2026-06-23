@@ -5,10 +5,64 @@ import { apiClient } from '../../../core/api/client';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../../navigation/types';
+import { Timetable, TimeSlot, RoutineSession } from '../../../shared/components/Timetable';
 
 type TeacherHomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'TeacherAttendanceTracking' | 'SuperuserReports'>;
 
 const SUPERUSER_PHONES = ['+917980357754', '+919831754957'];
+
+const MOCK_SESSIONS: RoutineSession[] = [
+  {
+    id: 's1',
+    dayOfWeek: 'Monday',
+    startTime: '04:30 PM',
+    endTime: '06:30 PM',
+    courseName: 'Mathematics',
+    batchName: 'Class 10',
+    location: 'Sodepur',
+    color: '#3CA79B'
+  },
+  {
+    id: 's2',
+    dayOfWeek: 'Monday',
+    startTime: '06:00 PM',
+    endTime: '09:00 PM',
+    courseName: 'Physics',
+    batchName: 'Class 11',
+    location: 'Madhyamgram',
+    color: '#D97706'
+  },
+  {
+    id: 's3',
+    dayOfWeek: 'Tuesday',
+    startTime: '10:00 AM',
+    endTime: '12:00 PM',
+    courseName: 'Chemistry',
+    batchName: 'Batch A',
+    location: 'Sodepur',
+    color: '#2563EB'
+  },
+  {
+    id: 's4',
+    dayOfWeek: 'Thursday',
+    startTime: '01:00 PM',
+    endTime: '03:30 PM',
+    courseName: 'Biology',
+    batchName: 'Batch C',
+    location: 'Madhyamgram',
+    color: '#10B981'
+  },
+  {
+    id: 's5',
+    dayOfWeek: 'Friday',
+    startTime: '11:00 AM',
+    endTime: '01:30 PM',
+    courseName: 'Mathematics',
+    batchName: 'Batch D',
+    location: 'Sodepur',
+    color: '#8B5CF6'
+  }
+];
 
 export const TeacherHomeScreen: React.FC = () => {
   const { user } = useAuthStore();
@@ -88,6 +142,17 @@ export const TeacherHomeScreen: React.FC = () => {
               </Text>
             </View>
 
+            {/* Timetable Component directly embedded */}
+            <View className="mb-6">
+              <Timetable 
+                title="Timetable"
+                sessions={MOCK_SESSIONS}
+                onSessionPress={(session) => {
+                  console.log('Pressed session:', session);
+                }}
+              />
+            </View>
+
             {/* Geofenced Attendance Card */}
             <View className="bg-slate-900 border border-slate-800 rounded-3xl p-5 mb-6">
               <View className="flex-row justify-between items-center">
@@ -159,3 +224,4 @@ export const TeacherHomeScreen: React.FC = () => {
     </View>
   );
 };
+

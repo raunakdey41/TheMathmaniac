@@ -50,16 +50,34 @@ model Course {
   price            Int
   categoryId       String
   category         CourseCategory  @relation(fields: [categoryId], references: [id])
-  instructorName   String
+  instructorName   String?
   learningOutcomes String
+  timeSlots        String?         @default("[]")
+  branch           String          @default("Sodepur")
+  targetClass      String?
   published        Boolean         @default(false)
+  isBundle         Boolean         @default(false)
   lectures         Lecture[]
   purchases        Purchase[]
   tests            Test[]
   studyMaterials   StudyMaterial[]
   teachers         CourseTeacher[]
+  bundleItems      BundleItem[]    @relation("BundleToItem")
+  partOfBundles    BundleItem[]    @relation("ItemToBundle")
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+}
+
+model BundleItem {
+  id         String   @id @default(uuid())
+  bundleId   String
+  courseId   String
+  createdAt  DateTime @default(now())
+
+  bundle     Course   @relation("BundleToItem", fields: [bundleId], references: [id], onDelete: Cascade)
+  course     Course   @relation("ItemToBundle", fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([bundleId, courseId])
 }
 
 model Lecture {
@@ -243,6 +261,9 @@ model TeacherSchedule {
   userId              String
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   title               String               // e.g. "Mathematics batch A"
+  campus              String               @default("Campus A") // Identifier for the institute branch
+  class               String?              // e.g. "Class 11"
+  subject             String?              // e.g. "Mathematics"
   date                String               // Format: YYYY-MM-DD
   startTime           String               // Format: HH:MM
   endTime             String               // Format: HH:MM

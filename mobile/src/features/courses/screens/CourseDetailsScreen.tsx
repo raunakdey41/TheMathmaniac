@@ -107,7 +107,25 @@ export const CourseDetailsScreen: React.FC<Props> = ({ route }) => {
             {course.category.name}
           </Text>
           <Text className="text-slate-100 text-2xl font-black mt-2 leading-8">{course.title}</Text>
-          <Text className="text-slate-400 text-sm mt-2 font-medium">Instructor: {course.instructorName}</Text>
+
+          {course.teachers && course.teachers.length > 0 && (
+            <View className="mt-4 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+              <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-3">Assigned Faculty</Text>
+              {course.teachers.map((t: any) => (
+                <View key={t.user.id} className="flex-row items-center mb-2">
+                  <View className="w-8 h-8 bg-blue-900/50 rounded-full items-center justify-center mr-3 border border-blue-500/30">
+                    <Text className="text-blue-400 font-bold text-xs">{t.user.name.charAt(0)}</Text>
+                  </View>
+                  <View>
+                    <Text className="text-slate-200 font-bold text-xs">{t.user.name}</Text>
+                    {t.user.subjects && (
+                      <Text className="text-blue-400 text-[10px] font-medium">{t.user.subjects}</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* 10-Second Value Outcomes */}
           <View className="bg-slate-900 border border-slate-800 rounded-3xl p-5 mt-6">

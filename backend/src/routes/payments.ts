@@ -97,7 +97,32 @@ router.post('/verify', authenticateJWT, async (req: AuthenticatedRequest, res: R
     });
 
     // Seed alert notifications
-    const course = await prisma.course.findUnique({ where: { id: purchase.courseId } });
+    const course = await prisma.course.findUnique({ 
+      where: { id: purchase.courseId },
+      include: { bundleItems: true }
+    });
+
+    // Check if it's a bundle and enroll in sub-courses
+    if (course?.isBundle && course.bundleItems && course.bundleItems.length > 0) {
+      const subPurchases = course.bundleItems.map(item => ({
+        userId,
+        courseId: item.courseId,
+        amount: 0,
+        status: 'SUCCESS',
+        razorpayOrderId: `bundle_auto_${orderId.substring(0, 10)}_${item.courseId.substring(0, 8)}`,
+        razorpayPaymentId: paymentId
+      }));
+      
+      const existingSubPurchases = await prisma.purchase.findMany({
+        where: { userId, courseId: { in: course.bundleItems.map(i => i.courseId) } }
+      });
+      const existingCourseIds = existingSubPurchases.map(p => p.courseId);
+      
+      const newSubPurchases = subPurchases.filter(p => !existingCourseIds.includes(p.courseId));
+      if (newSubPurchases.length > 0) {
+        await prisma.purchase.createMany({ data: newSubPurchases });
+      }
+    }
     await prisma.notification.create({
       data: {
         userId,

@@ -91,6 +91,13 @@ router.get('/:id', async (req, res) => {
       where: { id },
       include: {
         category: true,
+        teachers: {
+          include: {
+            user: {
+              select: { id: true, name: true, subjects: true }
+            }
+          }
+        },
         lectures: {
           orderBy: { sortOrder: 'asc' },
           select: {

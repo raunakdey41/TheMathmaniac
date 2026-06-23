@@ -255,9 +255,11 @@ router.get('/my-attendance', authenticateJWT, async (req: AuthenticatedRequest, 
   }
 });
 
-// Geofence Coordinate Constants (Institute Location)
-const INST_LAT = 22.5726; // Kolkata region
-const INST_LON = 88.3639;
+// Geofence Coordinate Constants (Institute Locations)
+const CAMPUSES: Record<string, { lat: number, lon: number }> = {
+  'Madhyamgram': { lat: 22.693230336542225, lon: 88.45923267330267 },
+  'Sodepur': { lat: 22.703237523450426, lon: 88.37139070110229 },
+};
 const GEOFENCE_RADIUS_METERS = 15;
 
 // Haversine formula to compute geodesic distance in meters
@@ -276,61 +278,69 @@ function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lo
   return R * c; // distance in meters
 }
 
-// 5. Get/Auto-Generate Teacher Schedules
+// 5. Get Teacher Schedules
 router.get('/teacher/schedule', authenticateJWT, requireTeacherOrAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const isAdmin = req.user?.role === 'ADMIN';
 
-    // Find if a schedule already exists for today
-    let schedule = await prisma.teacherSchedule.findFirst({
-      where: { userId, date: todayStr },
-    });
-
-    // Auto-generate one active class schedule if none exists to facilitate instant testing
-    if (!schedule) {
-      const now = new Date();
-      const isAdmin = req.user?.role === 'ADMIN';
-      
-      let title = 'Advanced Calculus Batch A';
-      let startTimeStr = '';
-      let endTimeStr = '';
-
-      if (isAdmin) {
-        title = 'Administrative Duty Shift';
-        startTimeStr = '11:00';
-        endTimeStr = '21:00';
-      } else {
-        // Class starts 1 hour ago and ends 2 hours from now
-        const start = new Date(now.getTime() - 60 * 60 * 1000);
-        const end = new Date(now.getTime() + 120 * 60 * 1000);
-        startTimeStr = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
-        endTimeStr = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
-      }
-
-      schedule = await prisma.teacherSchedule.create({
-        data: {
-          userId,
-          title,
-          date: todayStr,
-          startTime: startTimeStr,
-          endTime: endTimeStr,
-        },
-      });
-    }
-
-    // Retrieve all schedules
+    // If Admin, retrieve all schedules; otherwise, retrieve only for the logged-in teacher
     const schedules = await prisma.teacherSchedule.findMany({
-      where: { userId },
+      where: isAdmin ? undefined : { userId },
+      include: { user: { select: { name: true, email: true } } },
       orderBy: { date: 'desc' },
     });
 
+    // Map schedules to include campus coordinates
+    const schedulesWithCoords = schedules.map(s => ({
+      ...s,
+      campusCoords: CAMPUSES[s.campus] || CAMPUSES['Campus A']
+    }));
+
     return res.status(200).json({
       success: true,
-      data: schedules,
+      data: schedulesWithCoords,
     });
   } catch (error: any) {
     console.error('[Get Teacher Schedules Error]', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 5b. Create Teacher Schedule (Only for authorized personnel like Shubhadeep Biswas)
+router.post('/teacher/schedule', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { teacherId, title, campus, date, startTime, endTime, className, subject } = req.body;
+
+    const userRecord = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    const isAuthorized = userRecord?.name && userRecord.name.toLowerCase().includes('shubhadeep');
+    if (!isAuthorized) {
+      return res.status(403).json({ success: false, error: 'Access Denied: Only Shubhadeep Biswas can create schedules.' });
+    }
+
+    if (!teacherId || !title || !campus || !date || !startTime || !endTime || !className || !subject) {
+      return res.status(400).json({ success: false, error: 'All fields (teacherId, title, campus, date, startTime, endTime, className, subject) are required.' });
+    }
+
+    const schedule = await prisma.teacherSchedule.create({
+      data: {
+        userId: teacherId,
+        title,
+        campus,
+        class: className,
+        subject,
+        date,
+        startTime,
+        endTime,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: schedule,
+    });
+  } catch (error: any) {
+    console.error('[Create Teacher Schedule Error]', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -353,8 +363,11 @@ router.post('/teacher/ping', authenticateJWT, requireTeacherOrAdmin, async (req:
       return res.status(404).json({ success: false, error: 'Valid schedule not found.' });
     }
 
+    // Get the scheduled campus coordinates
+    const targetCampus = CAMPUSES[schedule.campus] || CAMPUSES['Madhyamgram'];
+
     // Calculate distance
-    const distance = calculateHaversineDistance(latitude, longitude, INST_LAT, INST_LON);
+    const distance = calculateHaversineDistance(latitude, longitude, targetCampus.lat, targetCampus.lon);
     const isInside = distance <= GEOFENCE_RADIUS_METERS;
 
     // Log the ping

@@ -39,6 +39,7 @@ export async function syncUserToFirestore(
         class: fullUser.class || null,
         faculty: fullUser.faculty || null,
         school: fullUser.school || null,
+        subjects: fullUser.subjects || null,
         createdAt: fullUser.createdAt,
         updatedAt: fullUser.updatedAt,
       };
@@ -325,6 +326,7 @@ router.post('/forgot-password/reset', async (req, res) => {
             class: fData.class || null,
             faculty: fData.faculty || null,
             school: fData.school || null,
+            subjects: fData.subjects || null,
           }
         });
       } else {
