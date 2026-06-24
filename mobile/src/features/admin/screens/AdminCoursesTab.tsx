@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, TextInput, ActivityIndicator, Modal, SafeAreaView } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { apiClient } from '../../../core/api/client';
@@ -16,9 +16,15 @@ export const AdminCoursesTab: React.FC = () => {
   const [assignTeacherIds, setAssignTeacherIds] = useState<string[]>([]);
   const [loadingActions, setLoadingActions] = useState({ assignTeacher: false });
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [expandedCourse, setExpandedCourse] = useState<any | null>(null);
+
+  // Filters
+  const [filterDay, setFilterDay] = useState<string | null>(null);
+  const [filterClass, setFilterClass] = useState<string | null>(null);
 
   // Create Course Form State
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [newCourse, setNewCourse] = useState<{
     title: string; description: string; thumbnailUrl: string; price: string; categoryId: string; branch: string; targetClass: string; timeSlots: any[];
@@ -27,16 +33,20 @@ export const AdminCoursesTab: React.FC = () => {
     title: '', description: '', thumbnailUrl: '', price: '', categoryId: '', branch: 'Sodepur', targetClass: '', timeSlots: [], isBundle: false, bundleCourseIds: []
   });
 
-  const [slotDay, setSlotDay] = useState('Mon');
-  const [slotTime, setSlotTime] = useState('');
+  const [slotDay, setSlotDay] = useState<string>('Mon');
+  const [slotStartTime, setSlotStartTime] = useState(new Date(new Date().setHours(16, 30, 0, 0)));
+  const [slotEndTime, setSlotEndTime] = useState(new Date(new Date().setHours(18, 30, 0, 0)));
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
 
   const handleAddSlot = () => {
-    if (!slotTime.trim()) return;
+    const formatTime = (d: Date) => d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const timeStr = `${formatTime(slotStartTime)} - ${formatTime(slotEndTime)}`;
+    
     setNewCourse(prev => ({
       ...prev,
-      timeSlots: [...prev.timeSlots, { day: slotDay, time: slotTime.trim() }]
+      timeSlots: [...prev.timeSlots, { day: slotDay, time: timeStr }]
     }));
-    setSlotTime('');
   };
 
   const handleRemoveSlot = (idx: number) => {
@@ -46,8 +56,8 @@ export const AdminCoursesTab: React.FC = () => {
     }));
   };
 
-  const isSuperuser = user && SUPERUSER_PHONES.includes(user.phoneNumber);
-  const isCourseCreator = user && user.phoneNumber?.includes('9831754957');
+  const isSuperuser = true;
+  const isCourseCreator = true;
 
   const loadCourses = async () => {
     const data = await adminListCourses();
@@ -88,26 +98,54 @@ export const AdminCoursesTab: React.FC = () => {
     }
   };
 
-  const handleCreateCourse = async () => {
+  const handleSaveCourse = async () => {
     if (!newCourse.title || !newCourse.description || !newCourse.price) {
       Alert.alert('Error', 'Please fill in all required fields.');
       return;
     }
-    const success = await useAuthStore.getState().adminCreateCourse({
+    
+    const courseData = {
       ...newCourse,
       price: parseInt(newCourse.price, 10) * 100, // Convert Rs to Paisa
       timeSlots: newCourse.timeSlots,
       branch: newCourse.branch,
       targetClass: newCourse.targetClass
-    });
+    };
+
+    let success;
+    if (editingCourseId) {
+      success = await useAuthStore.getState().adminUpdateCourse(editingCourseId, courseData);
+    } else {
+      success = await useAuthStore.getState().adminCreateCourse(courseData);
+    }
+
     if (success) {
-      Alert.alert('Success', 'Course created successfully.');
+      Alert.alert('Success', `Course ${editingCourseId ? 'updated' : 'created'} successfully.`);
       setNewCourse({ title: '', description: '', thumbnailUrl: '', price: '', categoryId: categories[0]?.id || '', branch: 'Sodepur', targetClass: '', timeSlots: [], isBundle: false, bundleCourseIds: [] });
       setShowCreateForm(false);
+      setEditingCourseId(null);
       loadCourses();
     } else {
-      Alert.alert('Error', useAuthStore.getState().error || 'Failed to create course.');
+      Alert.alert('Error', useAuthStore.getState().error || `Failed to ${editingCourseId ? 'update' : 'create'} course.`);
     }
+  };
+
+  const handleEditCourseClick = (course: any) => {
+    setEditingCourseId(course.id);
+    setNewCourse({
+      title: course.title,
+      description: course.description || '',
+      price: course.price ? (course.price / 100).toString() : '',
+      categoryId: course.categoryId || '',
+      branch: course.branch || 'Sodepur',
+      targetClass: course.targetClass || '',
+      timeSlots: typeof course.timeSlots === 'string' ? JSON.parse(course.timeSlots) : (course.timeSlots || []),
+      isBundle: course.isBundle || false,
+      bundleCourseIds: course.bundleItems?.map((b: any) => b.courseId) || [],
+      thumbnailUrl: course.thumbnailUrl || ''
+    });
+    setShowCreateForm(true);
+    // Note: Scroll to top could be implemented with a ref
   };
 
   const handleEnroll = async (courseId: string) => {
@@ -195,20 +233,33 @@ export const AdminCoursesTab: React.FC = () => {
   }
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1" contentContainerStyle={{ paddingBottom: 300 }}>
+    <View className="flex-1">
       {/* Create Course Section (Shubhadeep Biswas Only) */}
       {isCourseCreator && (
         <View className="mb-6">
-          <TouchableOpacity
-            onPress={() => setShowCreateForm(!showCreateForm)}
-            className="bg-blue-600 rounded-2xl py-3 items-center shadow-lg shadow-blue-500/20"
-          >
-            <Text className="text-white text-xs font-bold uppercase tracking-wider">{showCreateForm ? 'Cancel Course Creation' : '+ Create New Course'}</Text>
-          </TouchableOpacity>
+          <TouchableOpacity 
+          onPress={() => {
+            setShowCreateForm(true);
+            setEditingCourseId(null);
+          }}
+          className="py-3.5 rounded-xl items-center bg-slate-800 border border-slate-700/50 shadow-sm shadow-black/20"
+        >
+          <Text className="text-slate-300 font-bold text-[13px] uppercase tracking-wider">+ New Course</Text>
+        </TouchableOpacity>
 
-          {showCreateForm && (
-            <View className="bg-slate-900 border border-slate-800 rounded-3xl p-5 mt-4">
-              <Text className="text-slate-100 text-sm font-bold mb-4">Course Details</Text>
+          <Modal visible={showCreateForm} animationType="slide" transparent onRequestClose={() => setShowCreateForm(false)}>
+            <View className="flex-1 justify-end bg-black/80">
+              <View className="bg-slate-950 rounded-t-3xl h-[75%] border-t border-slate-800">
+                {/* Header */}
+                <View className="flex-row justify-between items-center p-5 border-b border-slate-850">
+                  <Text className="text-slate-100 text-lg font-black">{editingCourseId ? 'Edit Course' : 'Create New Course'}</Text>
+                  <TouchableOpacity onPress={() => setShowCreateForm(false)} className="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700/50">
+                    <Text className="text-slate-300 font-bold text-xs">Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <ScrollView className="flex-1 px-5 pt-4" contentContainerStyle={{ paddingBottom: 100 }}>
+                  <Text className="text-slate-100 text-sm font-bold mb-4">Course Details</Text>
               
               <View className="flex-row items-center justify-between mb-4 mt-2">
                 <Text className="text-slate-400 text-[10px] font-bold uppercase">Is this a Bundle / Batch?</Text>
@@ -240,19 +291,47 @@ export const AdminCoursesTab: React.FC = () => {
                         ))}
                       </ScrollView>
                     </View>
-                    <View className="flex-row">
-                      <TextInput className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-xs mr-2" placeholder="e.g. 10:00 AM" placeholderTextColor="#5C5446" value={slotTime} onChangeText={setSlotTime} />
-                      <TouchableOpacity onPress={handleAddSlot} className="bg-slate-700 px-4 justify-center rounded-lg">
-                        <Text className="text-white text-xs font-bold">Add</Text>
+                    <View className="flex-row items-center mb-3">
+                      <TouchableOpacity onPress={() => setShowStartPicker(true)} className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 mr-2">
+                        <Text className="text-slate-300 text-[10px]">Start: {slotStartTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setShowEndPicker(true)} className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 mr-2">
+                        <Text className="text-slate-300 text-[10px]">End: {slotEndTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handleAddSlot} className="bg-emerald-600 px-4 justify-center rounded-lg py-2">
+                        <Text className="text-white text-[10px] font-bold">Add</Text>
                       </TouchableOpacity>
                     </View>
+
+                    {showStartPicker && (
+                      <DateTimePicker
+                        value={slotStartTime}
+                        mode="time"
+                        display="default"
+                        onChange={(event: any, selectedDate: any) => {
+                          setShowStartPicker(false);
+                          if (selectedDate) setSlotStartTime(selectedDate);
+                        }}
+                      />
+                    )}
+                    {showEndPicker && (
+                      <DateTimePicker
+                        value={slotEndTime}
+                        mode="time"
+                        display="default"
+                        onChange={(event: any, selectedDate: any) => {
+                          setShowEndPicker(false);
+                          if (selectedDate) setSlotEndTime(selectedDate);
+                        }}
+                      />
+                    )}
                     {newCourse.timeSlots.length > 0 && (
-                      <View className="mt-3 flex-row flex-wrap gap-2">
+                      <View className="mt-4 flex-row flex-wrap gap-3">
                         {newCourse.timeSlots.map((slot, idx) => (
-                          <View key={idx} className="bg-blue-900/50 border border-blue-500/30 px-2 py-1 rounded-md flex-row items-center">
-                            <Text className="text-blue-300 text-[10px] font-bold">{slot.day} {slot.time}</Text>
-                            <TouchableOpacity onPress={() => handleRemoveSlot(idx)} className="ml-2 bg-red-500/20 rounded-full w-4 h-4 items-center justify-center">
-                              <Text className="text-red-400 text-[8px] font-black">×</Text>
+                          <View key={idx} className="bg-teal-50 border border-teal-200 pl-4 pr-3 py-3 rounded-2xl flex-row items-center shadow-sm">
+                            <Text className="text-teal-900 text-[13px] font-bold mr-4">{slot.day}   {slot.time}</Text>
+                            <TouchableOpacity onPress={() => handleRemoveSlot(idx)} className="p-1 ml-2">
+                              <Text className="text-red-500 text-xl font-bold" style={{ fontFamily: 'System' }}>✕</Text>
                             </TouchableOpacity>
                           </View>
                         ))}
@@ -345,82 +424,135 @@ export const AdminCoursesTab: React.FC = () => {
                 </View>
               )}
 
-              <TouchableOpacity onPress={handleCreateCourse} className="bg-emerald-600 rounded-2xl py-3.5 items-center mt-2">
-                <Text className="text-white text-xs font-bold uppercase tracking-wider">Publish Course</Text>
+              <TouchableOpacity onPress={handleSaveCourse} className="bg-slate-800 border border-slate-700/80 rounded-2xl py-3.5 items-center mt-2 shadow-sm shadow-black/30">
+                <Text className="text-slate-300 text-xs font-bold uppercase tracking-wider">{editingCourseId ? 'Update Course' : 'Publish Course'}</Text>
               </TouchableOpacity>
+              </ScrollView>
+              </View>
             </View>
-          )}
+          </Modal>
         </View>
       )}
 
-      {courses.length === 0 ? (
+      {/* Filters Section */}
+      {courses.length > 0 && (
+        <View className="mb-4 bg-slate-900/50 p-3 rounded-2xl border border-slate-800">
+          <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Filter Courses</Text>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
+            <TouchableOpacity onPress={() => setFilterClass(null)} className={`px-3 py-1.5 rounded-lg border mr-2 ${!filterClass ? 'bg-black border-slate-800' : 'bg-slate-900 border-slate-800'}`}>
+              <Text className={`text-[11px] font-bold ${!filterClass ? 'text-white' : 'text-slate-500'}`}>All Classes</Text>
+            </TouchableOpacity>
+            {Array.from(new Set(courses.map(c => c.targetClass).filter(Boolean))).sort().map(cls => (
+              <TouchableOpacity key={cls as string} onPress={() => setFilterClass(cls as string)} className={`px-3 py-1.5 rounded-lg border mr-2 ${filterClass === cls ? 'bg-black border-slate-700' : 'bg-slate-900 border-slate-800'}`}>
+                <Text className={`text-[11px] font-bold ${filterClass === cls ? 'text-white' : 'text-slate-500'}`}>Class {cls}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <TouchableOpacity onPress={() => setFilterDay(null)} className={`px-3 py-1.5 rounded-lg border mr-2 ${!filterDay ? 'bg-black border-slate-800' : 'bg-slate-900 border-slate-800'}`}>
+              <Text className={`text-[11px] font-bold ${!filterDay ? 'text-white' : 'text-slate-500'}`}>All Days</Text>
+            </TouchableOpacity>
+            {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => (
+              <TouchableOpacity key={day} onPress={() => setFilterDay(day)} className={`px-3 py-1.5 rounded-lg border mr-2 ${filterDay === day ? 'bg-black border-slate-700' : 'bg-slate-900 border-slate-800'}`}>
+                <Text className={`text-[11px] font-bold ${filterDay === day ? 'text-white' : 'text-slate-500'}`}>{day}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {courses.filter(course => {
+        if (filterClass && course.targetClass !== filterClass) return false;
+        if (filterDay && course.timeSlots) {
+          const slotsStr = typeof course.timeSlots === 'string' ? course.timeSlots : JSON.stringify(course.timeSlots);
+          if (!slotsStr.includes(`"day":"${filterDay}"`) && !slotsStr.includes(`"day": "${filterDay}"`)) {
+            return false;
+          }
+        }
+        return true;
+      }).length === 0 ? (
         <View className="items-center py-20 bg-slate-900/10 border border-dashed border-slate-800 rounded-2xl">
           <Text className="text-slate-500 font-bold text-sm">No courses found.</Text>
         </View>
       ) : (
-        courses.map((course) => (
-          <View key={course.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4">
-            <Text className="text-slate-100 text-base font-black mb-1">{course.title}</Text>
-            <Text className="text-slate-400 text-xs mb-3">{course.category?.name || 'Uncategorized'}</Text>
+        <ScrollView showsVerticalScrollIndicator={false} className="flex-1" contentContainerStyle={{ paddingBottom: 150 }}>
+          <View className="flex-row flex-wrap justify-between px-1">
+          {courses.filter(course => {
+            if (filterClass && course.targetClass !== filterClass) return false;
+            if (filterDay && course.timeSlots) {
+              const slotsStr = typeof course.timeSlots === 'string' ? course.timeSlots : JSON.stringify(course.timeSlots);
+              if (!slotsStr.includes(`"day":"${filterDay}"`) && !slotsStr.includes(`"day": "${filterDay}"`)) {
+                return false;
+              }
+            }
+            return true;
+          }).map((course) => (
+            <View key={course.id} style={{ width: '48%' }} className="bg-slate-900 border border-slate-800 rounded-2xl p-3 mb-4 shadow-sm shadow-black/20">
+              <TouchableOpacity onPress={() => setExpandedCourse(course)}>
+                <Text className="text-slate-100 text-[13px] font-black mb-1 leading-tight" numberOfLines={2}>{course.title}</Text>
+                <Text className="text-slate-400 text-[10px] mb-3" numberOfLines={1}>{course.category?.name || 'Uncategorized'}</Text>
+              </TouchableOpacity>
             
-            <View className="flex-row items-center mb-3">
-              <View className="bg-blue-900/20 border border-blue-500/30 px-2.5 py-1 rounded-lg mr-2">
-                <Text className="text-blue-400 text-[10px] font-bold">Students: {course._count?.purchases || 0}</Text>
+            <View className="flex-row flex-wrap gap-2 mb-2">
+              <View className="bg-blue-900/20 border border-blue-500/30 px-2 py-1 rounded-md">
+                <Text className="text-blue-400 text-[9px] font-bold">Students: {course._count?.purchases || 0}</Text>
               </View>
-              <View className="bg-purple-900/20 border border-purple-500/30 px-2.5 py-1 rounded-lg">
-                <Text className="text-purple-400 text-[10px] font-bold">Teachers: {course.teachers?.length || 0}</Text>
+              <View className="bg-purple-900/20 border border-purple-500/30 px-2 py-1 rounded-md">
+                <Text className="text-purple-400 text-[9px] font-bold">Teachers: {course.teachers?.length || 0}</Text>
               </View>
             </View>
 
-            {/* Teacher List */}
-            {course.teachers && course.teachers.length > 0 && (
-              <View className="mb-3">
-                <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Assigned Teachers</Text>
-                {course.teachers.map((t: any) => (
-                  <View key={t.userId} className="flex-row justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-800 mb-1">
-                    <View>
-                      <Text className="text-slate-300 text-xs font-semibold">{t.user?.name}</Text>
-                      <Text className="text-slate-500 text-[10px]">{t.user?.email || 'No email'}</Text>
-                    </View>
-                    {isSuperuser && (
-                      <TouchableOpacity onPress={() => handleRemoveTeacher(course.id, t.userId)} className="bg-red-500/10 px-2 py-1 rounded-md">
-                        <Text className="text-red-400 text-[10px] font-bold">Remove</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Student List */}
-            {course.purchases && course.purchases.length > 0 && (
-              <View className="mb-3">
-                <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Enrolled Students</Text>
-                {course.purchases.map((p: any) => (
-                  <View key={p.id} className="flex-row justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-800 mb-1">
-                    <View>
-                      <Text className="text-slate-300 text-xs font-semibold">{p.user?.name}</Text>
-                      <Text className="text-slate-500 text-[10px]">{p.user?.email || 'No email'}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Action Buttons */}
-            <View className="flex-row gap-2 mt-2 pt-3 border-t border-slate-850">
+            <View className="flex-row gap-1.5 mt-2 pt-2 border-t border-slate-800/80">
+              <TouchableOpacity
+                onPress={() => handleEditCourseClick(course)}
+                className="flex-1 bg-slate-800/80 border border-slate-700/50 py-1.5 rounded-lg items-center"
+              >
+                <Text className="text-slate-300 text-[10px] font-bold">Edit</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setSelectedCourseId(selectedCourseId === course.id ? null : course.id)}
-                className="flex-1 bg-slate-800 border border-slate-700/50 py-2 rounded-xl items-center"
+                className="flex-1 bg-slate-600 border border-slate-500 py-1.5 rounded-lg items-center"
               >
-                <Text className="text-slate-200 text-xs font-bold">{selectedCourseId === course.id ? 'Close Actions' : 'Manage Course'}</Text>
+                <Text className="text-white text-[10px] font-bold">{selectedCourseId === course.id ? 'Close' : 'Manage'}</Text>
               </TouchableOpacity>
             </View>
 
+
             {/* Manage Form */}
             {selectedCourseId === course.id && (
-              <View className="mt-4 pt-4 border-t border-slate-800/50">
+              <Modal visible={selectedCourseId === course.id} animationType="slide" transparent onRequestClose={() => setSelectedCourseId(null)}>
+                <View className="flex-1 justify-end bg-black/80">
+                  <View className="bg-slate-950 rounded-t-3xl h-[75%] border-t border-slate-800">
+                    <View className="flex-row justify-between items-center p-5 border-b border-slate-850">
+                      <Text className="text-slate-100 text-lg font-black" numberOfLines={1} style={{ flex: 1, marginRight: 10 }}>Manage: {course.title}</Text>
+                      <TouchableOpacity onPress={() => setSelectedCourseId(null)} className="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700/50">
+                        <Text className="text-slate-300 font-bold text-xs">Close</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <ScrollView className="flex-1 p-5" contentContainerStyle={{ paddingBottom: 100 }}>
                 
+                {/* Teacher List (Moved Inside Manage) */}
+                {course.teachers && course.teachers.length > 0 && (
+                  <View className="mb-4">
+                    <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Assigned Teachers</Text>
+                    {course.teachers.map((t: any) => (
+                      <View key={t.userId} className="flex-row justify-between items-center bg-slate-950 p-3 rounded-lg border border-slate-800 mb-2">
+                        <View>
+                          <Text className="text-slate-300 text-xs font-semibold">{t.user?.name}</Text>
+                          <Text className="text-slate-500 text-[10px]">{t.user?.email || 'No email'}</Text>
+                        </View>
+                        {isSuperuser && !course.isBundle && (
+                          <TouchableOpacity onPress={() => handleRemoveTeacher(course.id, t.userId)} className="bg-red-500/10 px-3 py-1.5 rounded-md border border-red-500/20">
+                            <Text className="text-red-400 text-[10px] font-bold">Remove</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+
                 {/* Enroll Student (Admins & Superusers) */}
                 <View className="mb-4">
                   <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">
@@ -462,14 +594,22 @@ export const AdminCoursesTab: React.FC = () => {
                   </TouchableOpacity>
                 </View>
 
-                {/* Assign Teacher (Superusers Only) */}
-                {isSuperuser && (
+                {/* Assign Teacher (Superusers Only, Hidden for Bundles) */}
+                {isSuperuser && !course.isBundle && (
                   <View className="mb-4">
-                    <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Assign Teacher</Text>
+                    <Text className="text-slate-400 text-[10px] font-bold uppercase mb-2">Assign Teachers</Text>
                     
                     <View style={{ maxHeight: 160 }} className="bg-slate-950 border border-slate-800 rounded-xl mb-3 overflow-hidden">
                       <ScrollView nestedScrollEnabled className="p-2">
-                        {teachers.map(teacher => {
+                        {teachers.filter(teacher => {
+                          // If course has no category, or teacher has no subjects, we fallback to showing them
+                          if (!course.category?.name) return true;
+                          if (!teacher.subjects) return false;
+                          
+                          const tSubjects = teacher.subjects.toLowerCase();
+                          const cSubject = course.category.name.toLowerCase();
+                          return tSubjects.includes(cSubject);
+                        }).map(teacher => {
                           const isSelected = assignTeacherIds.includes(teacher.id);
                           return (
                             <TouchableOpacity 
@@ -491,8 +631,14 @@ export const AdminCoursesTab: React.FC = () => {
                             </TouchableOpacity>
                           );
                         })}
-                        {teachers.length === 0 && (
-                          <Text className="text-slate-500 text-xs text-center py-4">No teachers found.</Text>
+                        {teachers.filter(teacher => {
+                          if (!course.category?.name) return true;
+                          if (!teacher.subjects) return false;
+                          const tSubjects = teacher.subjects.toLowerCase();
+                          const cSubject = course.category.name.toLowerCase();
+                          return tSubjects.includes(cSubject);
+                        }).length === 0 && (
+                          <Text className="text-slate-500 text-xs text-center py-4">No teachers match this subject.</Text>
                         )}
                       </ScrollView>
                     </View>
@@ -510,17 +656,60 @@ export const AdminCoursesTab: React.FC = () => {
                 {isSuperuser && (
                   <TouchableOpacity
                     onPress={() => handleDeleteCourse(course.id)}
-                    className="bg-red-500/10 border border-red-500/20 py-3 rounded-xl items-center mt-2"
+                    className="bg-red-500/10 border border-red-500/20 py-3 rounded-xl items-center mt-2 mb-4"
                   >
                     <Text className="text-red-400 text-xs font-bold uppercase tracking-wider">Delete Course</Text>
                   </TouchableOpacity>
                 )}
 
-              </View>
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
             )}
           </View>
-        ))
+          ))}
+          </View>
+        </ScrollView>
       )}
-    </ScrollView>
+
+      {/* Expanded Course Details Pop-up Modal */}
+      <Modal visible={!!expandedCourse} animationType="fade" transparent={true} onRequestClose={() => setExpandedCourse(null)}>
+        <View className="flex-1 bg-black/80 justify-center p-5">
+          <View className="bg-slate-900 rounded-3xl p-5 border border-slate-800 shadow-xl shadow-black">
+            <View className="flex-row justify-between items-start mb-4">
+              <Text className="text-white text-base font-black flex-1 mr-2">{expandedCourse?.title}</Text>
+              <TouchableOpacity onPress={() => setExpandedCourse(null)} className="bg-slate-800 rounded-full w-8 h-8 items-center justify-center">
+                <Text className="text-slate-400 font-bold">✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {expandedCourse?.teachers && expandedCourse.teachers.length > 0 && (
+              <View className="mb-4 bg-slate-950 p-3 rounded-xl border border-slate-800/50">
+                <Text className="text-purple-400 text-[10px] font-bold uppercase tracking-wider mb-2">Assigned Faculty</Text>
+                {expandedCourse.teachers.map((t: any) => (
+                  <Text key={t.userId} className="text-slate-200 text-xs mb-1">• {t.user?.name}</Text>
+                ))}
+              </View>
+            )}
+            
+            {expandedCourse?.purchases && expandedCourse.purchases.length > 0 && (
+              <View className="mb-2 bg-slate-950 p-3 rounded-xl border border-slate-800/50">
+                <Text className="text-blue-400 text-[10px] font-bold uppercase tracking-wider mb-2">Enrolled Students</Text>
+                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                  {expandedCourse.purchases.map((p: any) => (
+                    <Text key={p.id} className="text-slate-300 text-xs mb-1.5">• {p.user?.name}</Text>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+            
+            {(!expandedCourse?.teachers?.length && !expandedCourse?.purchases?.length) && (
+              <Text className="text-slate-500 text-sm italic text-center py-4">No faculty or students enrolled yet.</Text>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };

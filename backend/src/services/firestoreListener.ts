@@ -1,12 +1,14 @@
 import { db, isFirebaseEnabled } from '../config/firebase';
 import prisma from '../config/db';
 
+const unsubscribers: (() => void)[] = [];
+
 function setupCollectionListener(collectionName: string, defaultRole: 'STUDENT' | 'TEACHER' | 'ADMIN') {
   if (!db) return;
 
   console.log(`[Sync Listener] Starting Firestore real-time sync listener on "${collectionName}" collection...`);
 
-  db.collection(collectionName).onSnapshot(async (snapshot) => {
+  const unsubscribe = db.collection(collectionName).onSnapshot(async (snapshot) => {
     for (const change of snapshot.docChanges()) {
       const docData = change.doc.data();
       const userId = change.doc.id;
@@ -105,6 +107,8 @@ function setupCollectionListener(collectionName: string, defaultRole: 'STUDENT' 
   }, (error) => {
     console.error(`[Sync Listener] Firestore onSnapshot error on collection "${collectionName}":`, error);
   });
+
+  unsubscribers.push(unsubscribe);
 }
 
 export function startFirestoreListener() {
@@ -118,3 +122,13 @@ export function startFirestoreListener() {
   setupCollectionListener('teachers', 'TEACHER');
   setupCollectionListener('admin', 'ADMIN');
 }
+
+// Graceful shutdown to prevent backoff loop crashes in nodemon
+const cleanup = () => {
+  console.log('[Sync Listener] Cleaning up Firestore listeners...');
+  unsubscribers.forEach(unsub => unsub());
+};
+
+process.on('SIGTERM', cleanup);
+process.on('SIGINT', cleanup);
+process.on('SIGUSR2', cleanup); // used by nodemon

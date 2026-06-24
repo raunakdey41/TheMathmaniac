@@ -11,6 +11,46 @@ import { AdminRoutineTab } from './AdminRoutineTab';
 
 type AdminPanelScreenNavigationProp = StackNavigationProp<RootStackParamList, 'AdminPanel'>;
 
+const FilterDropdown = ({ label, value, options, onSelect }: { label: string, value: string, options: string[], onSelect: (v: string) => void }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <>
+      <TouchableOpacity onPress={() => setIsOpen(true)} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 justify-center mx-1">
+        <Text className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">{label}</Text>
+        <Text className="text-slate-200 text-xs font-bold" numberOfLines={1}>
+          {value === 'ALL' ? `All` : value}
+        </Text>
+      </TouchableOpacity>
+      
+      <Modal visible={isOpen} transparent animationType="fade" onRequestClose={() => setIsOpen(false)}>
+        <TouchableOpacity activeOpacity={1} onPress={() => setIsOpen(false)} className="flex-1 bg-black/80 justify-center px-6">
+          <View className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden max-h-[70%]">
+            <View className="p-4 border-b border-slate-800 bg-slate-950">
+              <Text className="text-slate-100 text-sm font-black text-center">Select {label}</Text>
+            </View>
+            <ScrollView className="p-2">
+              {options.map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  onPress={() => { onSelect(opt); setIsOpen(false); }}
+                  className={`p-4 rounded-xl mb-1 ${value === opt ? 'bg-[#2D8C82]' : 'bg-transparent'}`}
+                >
+                  <Text className={`text-center font-bold text-sm ${value === opt ? 'text-white' : 'text-slate-300'}`}>
+                    {opt === 'ALL' ? `All` : opt}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity onPress={() => setIsOpen(false)} className="p-4 border-t border-slate-800 bg-slate-950 mt-2">
+              <Text className="text-slate-400 text-xs font-bold text-center">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
+  );
+};
+
 export const AdminPanelScreen: React.FC = () => {
   const navigation = useNavigation<AdminPanelScreenNavigationProp>();
   const {
@@ -31,6 +71,7 @@ export const AdminPanelScreen: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<'ALL' | 'STUDENT' | 'TEACHER'>('ALL');
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [selectedSchool, setSelectedSchool] = useState<string>('ALL');
+  const [selectedSubject, setSelectedSubject] = useState<string>('ALL');
 
   // Create User Form State
   const [name, setName] = useState('');
@@ -97,25 +138,36 @@ export const AdminPanelScreen: React.FC = () => {
     return ['ALL', ...Array.from(new Set(schools))];
   }, [users]);
 
+  const uniqueSubjects = React.useMemo(() => {
+    const allSubjects = new Set<string>();
+    users.forEach(u => {
+      if (u.subjects) {
+        u.subjects.split(',').forEach((s: string) => allSubjects.add(s.trim()));
+      }
+    });
+    return ['ALL', ...Array.from(allSubjects)];
+  }, [users]);
+
   const filteredUsers = React.useMemo(() => {
     return users.filter(user => {
       const matchesClass = selectedClass === 'ALL' || user.class === selectedClass;
       const matchesSchool = selectedSchool === 'ALL' || user.school === selectedSchool;
-      return matchesClass && matchesSchool;
+      const matchesSubject = selectedSubject === 'ALL' || (user.subjects && user.subjects.split(',').map((s: string)=>s.trim()).includes(selectedSubject));
+      return matchesClass && matchesSchool && matchesSubject;
     });
-  }, [users, selectedClass, selectedSchool]);
+  }, [users, selectedClass, selectedSchool, selectedSubject]);
 
   useEffect(() => {
-    if (!uniqueClasses.includes(selectedClass)) {
-      setSelectedClass('ALL');
-    }
+    if (!uniqueClasses.includes(selectedClass)) setSelectedClass('ALL');
   }, [uniqueClasses]);
 
   useEffect(() => {
-    if (!uniqueSchools.includes(selectedSchool)) {
-      setSelectedSchool('ALL');
-    }
+    if (!uniqueSchools.includes(selectedSchool)) setSelectedSchool('ALL');
   }, [uniqueSchools]);
+
+  useEffect(() => {
+    if (!uniqueSubjects.includes(selectedSubject)) setSelectedSubject('ALL');
+  }, [uniqueSubjects]);
 
   const handleCreateSubmit = async () => {
     if (!name.trim()) {
@@ -164,6 +216,39 @@ export const AdminPanelScreen: React.FC = () => {
     } else {
       const errorMsg = useAuthStore.getState().error || 'Failed to create user.';
       Alert.alert('Creation Failed', errorMsg);
+    }
+  };
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleEditPress = (userItem: any) => {
+    setEditingUser(userItem);
+    setEditForm({
+      name: userItem.name || '',
+      email: userItem.email || '',
+      stream: userItem.stream || '',
+      class: userItem.class || '',
+      school: userItem.school || '',
+      faculty: userItem.faculty || '',
+      subjects: userItem.subjects || '',
+    });
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editForm.name?.trim()) {
+      Alert.alert('Error', 'Name is required.');
+      return;
+    }
+    setIsUpdating(true);
+    const success = await useAuthStore.getState().adminUpdateUser(editingUser.id, editForm);
+    setIsUpdating(false);
+    if (success) {
+      Alert.alert('Success', 'User updated successfully.');
+      setEditingUser(null);
+      loadUsers();
+    } else {
+      Alert.alert('Error', useAuthStore.getState().error || 'Failed to update user.');
     }
   };
 
@@ -271,169 +356,124 @@ export const AdminPanelScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Geotagged Attendance Tracker Action Banner for Admin */}
-      <View className="bg-slate-900 border border-slate-800 rounded-3xl p-5 mb-6">
-        <View className="flex-row justify-between items-center">
-          <View className="flex-1 mr-4">
-            <Text className="text-slate-100 text-sm font-bold">📍 Geofenced Attendance</Text>
-            <Text className="text-slate-500 text-[10px] mt-1 font-semibold leading-4">
-              Clock in and track your duty shift hours (11:00 AM - 09:00 PM) matching the geofence boundary.
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('TeacherAttendanceTracking')}
-            className="bg-[#2D8C82] border border-[#3CA79B] px-4 py-2.5 rounded-2xl active:opacity-90 shadow-md shadow-teal-500/10"
-          >
-            <Text className="text-white text-xs font-extrabold uppercase tracking-wider">Start Tracking</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Tabs */}
-      <View className="flex-row bg-slate-900 p-1.5 rounded-2xl mb-6 border border-slate-800">
-        <TouchableOpacity
-          onPress={() => setActiveTab('directory')}
-          className={`flex-1 py-3 rounded-xl items-center justify-center ${
-            activeTab === 'directory' ? 'bg-slate-800' : 'bg-transparent'
-          }`}
-        >
-          <Text className={`font-bold text-[10px] ${activeTab === 'directory' ? 'text-slate-100' : 'text-slate-400'}`}>
-            Directory
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setActiveTab('create')}
-          className={`flex-1 py-3 rounded-xl items-center justify-center ${
-            activeTab === 'create' ? 'bg-slate-800' : 'bg-transparent'
-          }`}
-        >
-          <Text className={`font-bold text-[10px] ${activeTab === 'create' ? 'text-slate-100' : 'text-slate-400'}`}>
-            Create
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setActiveTab('audit')}
-          className={`flex-1 py-3 rounded-xl items-center justify-center ${
-            activeTab === 'audit' ? 'bg-slate-800' : 'bg-transparent'
-          }`}
-        >
-          <Text className={`font-bold text-[10px] ${activeTab === 'audit' ? 'text-slate-100' : 'text-slate-400'}`}>
-            Logs
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setActiveTab('courses')}
-          className={`flex-1 py-3 rounded-xl items-center justify-center ${
-            activeTab === 'courses' ? 'bg-slate-800' : 'bg-transparent'
-          }`}
-        >
-          <Text className={`font-bold text-[10px] ${activeTab === 'courses' ? 'text-slate-100' : 'text-slate-400'}`}>
-            Courses
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setActiveTab('routines')}
-          className={`flex-1 py-3 rounded-xl items-center justify-center ${
-            activeTab === 'routines' ? 'bg-slate-800' : 'bg-transparent'
-          }`}
-        >
-          <Text className={`font-bold text-[10px] ${activeTab === 'routines' ? 'text-slate-100' : 'text-slate-400'}`}>
-            Routines
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Content Area */}
       {activeTab === 'directory' && (
-        <View className="flex-1">
-          {/* Filters */}
-          <View className="flex-row gap-3 mb-4">
-            <TextInput
-              className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3.5 text-slate-100 text-sm font-semibold"
-              placeholder="Search by name or phone..."
-              placeholderTextColor="#8A8070"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-          
-          <View className="flex-row bg-slate-900/50 p-1 rounded-xl mb-4 border border-slate-800/40">
-            {['ALL', 'STUDENT', 'TEACHER'].map((r) => (
-              <TouchableOpacity
-                key={r}
-                onPress={() => setRoleFilter(r as any)}
-                className={`flex-1 py-2 rounded-lg items-center ${
-                  roleFilter === r ? 'bg-slate-800' : 'bg-transparent'
-                }`}
-              >
-                <Text className={`font-black text-[10px] uppercase tracking-wider ${
-                  roleFilter === r ? 'text-slate-100' : 'text-slate-500'
-                }`}>
-                  {r}
+        <ScrollView showsVerticalScrollIndicator={false} className="flex-1" keyboardShouldPersistTaps="handled" stickyHeaderIndices={[2]}>
+          {/* Geotagged Attendance Tracker Action Banner for Admin */}
+          <View className="bg-slate-900 border border-slate-800 rounded-3xl p-5 mb-6">
+            <View className="flex-row justify-between items-center">
+              <View className="flex-1 mr-4">
+                <Text className="text-slate-100 text-sm font-bold">📍 Geofenced Attendance</Text>
+                <Text className="text-slate-500 text-[10px] mt-1 font-semibold leading-4">
+                  Clock in and track your duty shift hours (11:00 AM - 09:00 PM) matching the geofence boundary.
                 </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('TeacherAttendanceTracking')}
+                className="bg-[#2D8C82] border border-[#3CA79B] px-4 py-2.5 rounded-2xl active:opacity-90 shadow-md shadow-teal-500/10"
+              >
+                <Text className="text-white text-xs font-extrabold uppercase tracking-wider">Start Tracking</Text>
               </TouchableOpacity>
-            ))}
+            </View>
           </View>
 
-          {/* Class & School Filter Badges */}
-          {users.length > 0 && (
-            <View className="mb-4">
-              {/* Class Filter */}
-              {uniqueClasses.length > 2 && (
-                <View className="mb-3">
-                  <Text className="text-slate-500 text-[9px] font-black uppercase tracking-wider mb-1.5">Filter by Class</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                    {uniqueClasses.map((cls) => (
-                      <TouchableOpacity
-                        key={cls}
-                        onPress={() => setSelectedClass(cls)}
-                        className={`mr-2 px-3 py-1.5 rounded-xl border ${
-                          selectedClass === cls
-                            ? 'bg-blue-600 border-blue-500'
-                            : 'bg-slate-900 border-slate-800'
-                        }`}
-                      >
-                        <Text className={`text-[10px] font-bold ${
-                          selectedClass === cls ? 'text-white' : 'text-slate-400'
-                        }`}>
-                          {cls === 'ALL' ? 'All Classes' : cls}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
+          {/* Tabs */}
+          <View className="flex-row bg-slate-900 p-1.5 rounded-2xl mb-6 border border-slate-800">
+            <TouchableOpacity
+              onPress={() => setActiveTab('directory')}
+              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+                (activeTab as string) === 'directory' ? 'bg-slate-800' : 'bg-transparent'
+              }`}
+            >
+              <Text className={`font-bold text-[10px] ${(activeTab as string) === 'directory' ? 'text-slate-100' : 'text-slate-400'}`}>
+                Directory
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('create')}
+              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+                (activeTab as string) === 'create' ? 'bg-slate-800' : 'bg-transparent'
+              }`}
+            >
+              <Text className={`font-bold text-[10px] ${(activeTab as string) === 'create' ? 'text-slate-100' : 'text-slate-400'}`}>
+                Create
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('audit')}
+              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+                (activeTab as string) === 'audit' ? 'bg-slate-800' : 'bg-transparent'
+              }`}
+            >
+              <Text className={`font-bold text-[10px] ${(activeTab as string) === 'audit' ? 'text-slate-100' : 'text-slate-400'}`}>
+                Logs
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('courses')}
+              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+                (activeTab as string) === 'courses' ? 'bg-slate-800' : 'bg-transparent'
+              }`}
+            >
+              <Text className={`font-bold text-[10px] ${(activeTab as string) === 'courses' ? 'text-slate-100' : 'text-slate-400'}`}>
+                Courses
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('routines')}
+              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+                (activeTab as string) === 'routines' ? 'bg-slate-800' : 'bg-transparent'
+              }`}
+            >
+              <Text className={`font-bold text-[10px] ${(activeTab as string) === 'routines' ? 'text-slate-100' : 'text-slate-400'}`}>
+                Routines
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-              {/* School Filter */}
-              {uniqueSchools.length > 2 && (
-                <View className="mb-2">
-                  <Text className="text-slate-500 text-[9px] font-black uppercase tracking-wider mb-1.5">Filter by School</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                    {uniqueSchools.map((sch) => (
-                      <TouchableOpacity
-                        key={sch}
-                        onPress={() => setSelectedSchool(sch)}
-                        className={`mr-2 px-3 py-1.5 rounded-xl border ${
-                          selectedSchool === sch
-                            ? 'bg-blue-600 border-blue-500'
-                            : 'bg-slate-900 border-slate-800'
-                        }`}
-                      >
-                        <Text className={`text-[10px] font-bold ${
-                          selectedSchool === sch ? 'text-white' : 'text-slate-400'
-                        }`}>
-                          {sch === 'ALL' ? 'All Schools' : sch}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
+          {/* Sticky Header Group */}
+          <View className="bg-slate-950 z-10">
+            {/* Filters */}
+            <View className="flex-row gap-3 mb-4">
+              <TextInput
+                className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3.5 text-slate-100 text-sm font-semibold"
+                placeholder="Search by name or phone..."
+                placeholderTextColor="#8A8070"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
             </View>
-          )}
+            
+            <View className="flex-row bg-slate-900/50 p-1 rounded-xl mb-4 border border-slate-800/40">
+              {['ALL', 'STUDENT', 'TEACHER'].map((r) => (
+                <TouchableOpacity
+                  key={r}
+                  onPress={() => setRoleFilter(r as any)}
+                  className={`flex-1 py-2 rounded-lg items-center ${
+                    roleFilter === r ? 'bg-slate-800' : 'bg-transparent'
+                  }`}
+                >
+                  <Text className={`font-black text-[10px] uppercase tracking-wider ${
+                    roleFilter === r ? 'text-slate-100' : 'text-slate-500'
+                  }`}>
+                    {r}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Dropdown Filters in one row */}
+            {users.length > 0 && (
+              <View className="flex-row mb-4 bg-slate-900 border border-slate-800 rounded-2xl p-2 items-center">
+                <FilterDropdown label="Class" value={selectedClass} options={uniqueClasses} onSelect={setSelectedClass} />
+                <FilterDropdown label="School" value={selectedSchool} options={uniqueSchools} onSelect={setSelectedSchool} />
+                <FilterDropdown label="Subject" value={selectedSubject} options={uniqueSubjects} onSelect={setSelectedSubject} />
+              </View>
+            )}
+          </View>
 
           {/* User List */}
-          <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+          <View className="flex-1">
             {isLoading && users.length === 0 ? (
               <View className="items-center py-20">
                 <ActivityIndicator size="small" color="#2D8C82" />
@@ -482,7 +522,7 @@ export const AdminPanelScreen: React.FC = () => {
                             )}
                           </View>
                         )}
-                        {item.role === 'TEACHER' && item.subjects && (
+                        {item.subjects && (
                           <View className="mt-2">
                             <Text className="text-[10px] text-slate-400 font-medium">Subjects: {item.subjects}</Text>
                           </View>
@@ -506,7 +546,13 @@ export const AdminPanelScreen: React.FC = () => {
                           {item.firstLogin ? 'Temp Password active' : 'Password changed'}
                         </Text>
                       </View>
-                      <View className="flex-row gap-2">
+                      <View className="flex-row gap-2 mt-2">
+                        <TouchableOpacity
+                          onPress={() => handleEditPress(item)}
+                          className="bg-slate-700/50 border border-slate-600/50 px-3 py-1.5 rounded-xl"
+                        >
+                          <Text className="text-slate-300 text-[10px] font-bold">Edit</Text>
+                        </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => handleRecoverPress(item)}
                           className="bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-xl"
@@ -525,7 +571,65 @@ export const AdminPanelScreen: React.FC = () => {
                 ))}
               </View>
             )}
-          </ScrollView>
+          </View>
+        </ScrollView>
+      )}
+
+      {activeTab !== 'directory' && (
+        <View className="mb-6">
+          {/* Tabs for non-directory */}
+          <View className="flex-row bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
+            <TouchableOpacity
+              onPress={() => setActiveTab('directory')}
+              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+                (activeTab as string) === 'directory' ? 'bg-slate-800' : 'bg-transparent'
+              }`}
+            >
+              <Text className={`font-bold text-[10px] ${(activeTab as string) === 'directory' ? 'text-slate-100' : 'text-slate-400'}`}>
+                Directory
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('create')}
+              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+                activeTab === 'create' ? 'bg-slate-800' : 'bg-transparent'
+              }`}
+            >
+              <Text className={`font-bold text-[10px] ${activeTab === 'create' ? 'text-slate-100' : 'text-slate-400'}`}>
+                Create
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('audit')}
+              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+                activeTab === 'audit' ? 'bg-slate-800' : 'bg-transparent'
+              }`}
+            >
+              <Text className={`font-bold text-[10px] ${activeTab === 'audit' ? 'text-slate-100' : 'text-slate-400'}`}>
+                Logs
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('courses')}
+              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+                activeTab === 'courses' ? 'bg-slate-800' : 'bg-transparent'
+              }`}
+            >
+              <Text className={`font-bold text-[10px] ${activeTab === 'courses' ? 'text-slate-100' : 'text-slate-400'}`}>
+                Courses
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('routines')}
+              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+                activeTab === 'routines' ? 'bg-slate-800' : 'bg-transparent'
+              }`}
+            >
+              <Text className={`font-bold text-[10px] ${activeTab === 'routines' ? 'text-slate-100' : 'text-slate-400'}`}>
+                Routines
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -637,18 +741,16 @@ export const AdminPanelScreen: React.FC = () => {
               </View>
             )}
 
-            {role === 'TEACHER' && (
-              <View className="mb-4">
-                <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">Subjects</Text>
-                <TextInput
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm font-semibold mb-4"
-                  placeholder="e.g. Mathematics, Physics"
-                  placeholderTextColor="#5C5446"
-                  value={subjects}
-                  onChangeText={setSubjects}
-                />
-              </View>
-            )}
+            <View className="mb-4">
+              <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">Subjects (Comma separated)</Text>
+              <TextInput
+                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm font-semibold mb-4"
+                placeholder="e.g. Mathematics, Physics"
+                placeholderTextColor="#5C5446"
+                value={subjects}
+                onChangeText={setSubjects}
+              />
+            </View>
 
             <Button
               title="Generate Credentials & Create"
@@ -773,6 +875,82 @@ export const AdminPanelScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Edit User Modal */}
+      <Modal visible={!!editingUser} animationType="slide" transparent onRequestClose={() => setEditingUser(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 justify-end bg-black/80">
+          <View className="bg-slate-950 rounded-t-3xl h-[85%] border-t border-slate-800">
+            <View className="flex-row justify-between items-center p-5 border-b border-slate-850">
+              <Text className="text-slate-100 text-lg font-black">Edit User</Text>
+              <TouchableOpacity onPress={() => setEditingUser(null)} className="bg-slate-800 px-4 py-2 rounded-xl border border-slate-700/50">
+                <Text className="text-slate-300 font-bold text-xs">Cancel</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView className="flex-1 p-5" contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+              <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">Full Name</Text>
+              <TextInput
+                className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm font-semibold mb-4"
+                value={editForm.name}
+                onChangeText={(t) => setEditForm({...editForm, name: t})}
+              />
+
+              <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">Email Address</Text>
+              <TextInput
+                className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm font-semibold mb-4"
+                value={editForm.email}
+                onChangeText={(t) => setEditForm({...editForm, email: t})}
+                keyboardType="email-address"
+              />
+
+              {editingUser?.role === 'STUDENT' && (
+                <View>
+                  <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">Stream</Text>
+                  <TextInput
+                    className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm font-semibold mb-4"
+                    value={editForm.stream}
+                    onChangeText={(t) => setEditForm({...editForm, stream: t})}
+                  />
+
+                  <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">Class</Text>
+                  <TextInput
+                    className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm font-semibold mb-4"
+                    value={editForm.class}
+                    onChangeText={(t) => setEditForm({...editForm, class: t})}
+                  />
+
+                  <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">School</Text>
+                  <TextInput
+                    className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm font-semibold mb-4"
+                    value={editForm.school}
+                    onChangeText={(t) => setEditForm({...editForm, school: t})}
+                  />
+
+                  <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">Faculty</Text>
+                  <TextInput
+                    className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm font-semibold mb-4"
+                    value={editForm.faculty}
+                    onChangeText={(t) => setEditForm({...editForm, faculty: t})}
+                  />
+                </View>
+              )}
+
+              <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">Subjects (Comma separated)</Text>
+              <TextInput
+                className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm font-semibold mb-4"
+                value={editForm.subjects}
+                onChangeText={(t) => setEditForm({...editForm, subjects: t})}
+              />
+
+              <View className="mb-20">
+                <Button title="Save Changes" onPress={handleUpdateUser} loading={isUpdating} />
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
+
+export default AdminPanelScreen;

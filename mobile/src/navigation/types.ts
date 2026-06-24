@@ -16,6 +16,7 @@ export type RootStackParamList = {
   ForgotPassword: undefined;
   ForgotPasswordReset: { resetToken: string };
   MandatoryChangePassword: undefined;
+  ChangePassword: undefined;
   AdminPanel: undefined;
   AppTabs: NavigatorScreenParams<AppTabsParamList>;
   CourseDetails: { courseId: string };

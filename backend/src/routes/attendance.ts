@@ -278,13 +278,73 @@ function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lo
   return R * c; // distance in meters
 }
 
-// 5. Get Teacher Schedules
+// 5. Get Teacher Schedules (Auto-Generated from Course TimeSlots)
 router.get('/teacher/schedule', authenticateJWT, requireTeacherOrAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const isAdmin = req.user?.role === 'ADMIN';
 
-    // If Admin, retrieve all schedules; otherwise, retrieve only for the logged-in teacher
+    // Auto-generate schedules for the next 14 days based on Course assignments
+    const today = new Date();
+    const next14Days: string[] = [];
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + i);
+      next14Days.push(d.toISOString().split('T')[0]);
+    }
+    const shortDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    const courseTeachers = await prisma.courseTeacher.findMany({
+      where: isAdmin ? undefined : { userId },
+      include: { course: { include: { category: true } }, user: true }
+    });
+
+    for (const ct of courseTeachers) {
+      const course = ct.course;
+      if (!course.timeSlots) continue;
+      
+      let slots: any[] = [];
+      try {
+        slots = JSON.parse(course.timeSlots);
+      } catch(e) {}
+      
+      for (const slot of slots) {
+        if (!slot.day || !slot.startTime || !slot.endTime) continue;
+        const slotDayStr = slot.day.substring(0, 3); 
+        
+        for (const dateStr of next14Days) {
+          const d = new Date(dateStr);
+          const dayName = shortDays[d.getDay()];
+          if (dayName === slotDayStr) {
+            const title = course.title;
+            const campus = course.branch || 'Madhyamgram';
+            const targetClass = course.targetClass || '';
+            const subject = course.category?.name || '';
+            
+            const existing = await prisma.teacherSchedule.findFirst({
+               where: { userId: ct.userId, date: dateStr, startTime: slot.startTime, endTime: slot.endTime, title }
+            });
+            
+            if (!existing) {
+               await prisma.teacherSchedule.create({
+                  data: {
+                     userId: ct.userId,
+                     title,
+                     campus,
+                     class: targetClass,
+                     subject,
+                     date: dateStr,
+                     startTime: slot.startTime,
+                     endTime: slot.endTime
+                  }
+               });
+            }
+          }
+        }
+      }
+    }
+
+    // Now retrieve all schedules
     const schedules = await prisma.teacherSchedule.findMany({
       where: isAdmin ? undefined : { userId },
       include: { user: { select: { name: true, email: true } } },
@@ -303,44 +363,6 @@ router.get('/teacher/schedule', authenticateJWT, requireTeacherOrAdmin, async (r
     });
   } catch (error: any) {
     console.error('[Get Teacher Schedules Error]', error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// 5b. Create Teacher Schedule (Only for authorized personnel like Shubhadeep Biswas)
-router.post('/teacher/schedule', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { teacherId, title, campus, date, startTime, endTime, className, subject } = req.body;
-
-    const userRecord = await prisma.user.findUnique({ where: { id: req.user!.id } });
-    const isAuthorized = userRecord?.name && userRecord.name.toLowerCase().includes('shubhadeep');
-    if (!isAuthorized) {
-      return res.status(403).json({ success: false, error: 'Access Denied: Only Shubhadeep Biswas can create schedules.' });
-    }
-
-    if (!teacherId || !title || !campus || !date || !startTime || !endTime || !className || !subject) {
-      return res.status(400).json({ success: false, error: 'All fields (teacherId, title, campus, date, startTime, endTime, className, subject) are required.' });
-    }
-
-    const schedule = await prisma.teacherSchedule.create({
-      data: {
-        userId: teacherId,
-        title,
-        campus,
-        class: className,
-        subject,
-        date,
-        startTime,
-        endTime,
-      },
-    });
-
-    return res.status(201).json({
-      success: true,
-      data: schedule,
-    });
-  } catch (error: any) {
-    console.error('[Create Teacher Schedule Error]', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 });

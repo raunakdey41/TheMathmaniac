@@ -8,29 +8,29 @@ generator client {
 }
 
 model User {
-  id              String            @id @default(uuid())
-  name            String
-  email           String?           @unique
-  googleId        String?
-  firstLogin      Boolean           @default(true)
-  role            String            @default("STUDENT")
-  stream          String?
-  class           String?
-  faculty         String?
-  school          String?
-  subjects        String?
-  purchases       Purchase[]
-  lectureProgress LectureProgress[]
-  results         Result[]
-  notifications   Notification[]
-  attendance      Attendance[]
-  feePayments     FeePayment[]
+  id                  String               @id @default(uuid())
+  name                String
+  email               String?              @unique
+  googleId            String?
+  firstLogin          Boolean              @default(true)
+  role                String               @default("STUDENT")
+  stream              String?
+  class               String?
+  faculty             String?
+  school              String?
+  subjects            String?
+  purchases           Purchase[]
+  lectureProgress     LectureProgress[]
+  results             Result[]
+  notifications       Notification[]
+  attendance          Attendance[]
+  feePayments         FeePayment[]
   teacherSchedules    TeacherSchedule[]
   teacherLocationLogs TeacherLocationLog[]
   teacherAttendances  TeacherAttendance[]
   courseTeachers      CourseTeacher[]
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 
   @@index([email])
 }
@@ -69,13 +69,13 @@ model Course {
 }
 
 model BundleItem {
-  id         String   @id @default(uuid())
-  bundleId   String
-  courseId   String
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  bundleId  String
+  courseId  String
+  createdAt DateTime @default(now())
 
-  bundle     Course   @relation("BundleToItem", fields: [bundleId], references: [id], onDelete: Cascade)
-  course     Course   @relation("ItemToBundle", fields: [courseId], references: [id], onDelete: Cascade)
+  bundle Course @relation("BundleToItem", fields: [bundleId], references: [id], onDelete: Cascade)
+  course Course @relation("ItemToBundle", fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([bundleId, courseId])
 }
@@ -111,16 +111,16 @@ model LectureProgress {
 }
 
 model Purchase {
-  id               String   @id @default(uuid())
-  userId           String
-  user             User     @relation(fields: [userId], references: [id])
-  courseId         String
-  course           Course   @relation(fields: [courseId], references: [id])
-  amount           Int
-  status           String
-  razorpayOrderId  String   @unique
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  courseId          String
+  course            Course   @relation(fields: [courseId], references: [id])
+  amount            Int
+  status            String
+  razorpayOrderId   String   @unique
   razorpayPaymentId String?
-  createdAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
 
   @@index([userId])
   @@index([courseId])
@@ -225,11 +225,11 @@ model AuditLog {
 
 model Attendance {
   id         String   @id @default(uuid())
-  date       String   // Format: YYYY-MM-DD
-  status     String   // "PRESENT", "ABSENT", "CANCELLED", "HOLIDAY"
+  date       String // Format: YYYY-MM-DD
+  status     String // "PRESENT", "ABSENT", "CANCELLED", "HOLIDAY"
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  recordedBy String   // Teacher/Admin ID who recorded it
+  recordedBy String // Teacher/Admin ID who recorded it
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -242,11 +242,11 @@ model FeePayment {
   id                String    @id @default(uuid())
   userId            String
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  month             String    // Format: YYYY-MM
-  amount            Int       // Base fee in Paisa
-  fine              Int       // Fine in Paisa
-  totalAmount       Int       // amount + fine in Paisa
-  status            String    // "PENDING", "SUCCESS", "FAILED"
+  month             String // Format: YYYY-MM
+  amount            Int // Base fee in Paisa
+  fine              Int // Fine in Paisa
+  totalAmount       Int // amount + fine in Paisa
+  status            String // "PENDING", "SUCCESS", "FAILED"
   razorpayOrderId   String?   @unique
   razorpayPaymentId String?
   paidAt            DateTime?
@@ -260,13 +260,13 @@ model TeacherSchedule {
   id                  String               @id @default(uuid())
   userId              String
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title               String               // e.g. "Mathematics batch A"
+  title               String // e.g. "Mathematics batch A"
   campus              String               @default("Campus A") // Identifier for the institute branch
-  class               String?              // e.g. "Class 11"
-  subject             String?              // e.g. "Mathematics"
-  date                String               // Format: YYYY-MM-DD
-  startTime           String               // Format: HH:MM
-  endTime             String               // Format: HH:MM
+  class               String? // e.g. "Class 11"
+  subject             String? // e.g. "Mathematics"
+  date                String // Format: YYYY-MM-DD
+  startTime           String // Format: HH:MM
+  endTime             String // Format: HH:MM
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   teacherLocationLogs TeacherLocationLog[]
@@ -283,8 +283,8 @@ model TeacherLocationLog {
   schedule   TeacherSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   latitude   Float
   longitude  Float
-  distance   Float           // distance from institute in meters
-  isInside   Boolean         // inside 20m radius
+  distance   Float // distance from institute in meters
+  isInside   Boolean // inside 20m radius
   timestamp  DateTime        @default(now())
 
   @@index([userId])
@@ -297,9 +297,9 @@ model TeacherAttendance {
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   scheduleId    String
   schedule      TeacherSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  date          String          // Format: YYYY-MM-DD
-  status        String          // "PRESENT", "PARTIAL", "ABSENT"
-  presenceRatio Float           // fraction of inside pings vs total pings
+  date          String // Format: YYYY-MM-DD
+  status        String // "PRESENT", "PARTIAL", "ABSENT"
+  presenceRatio Float // fraction of inside pings vs total pings
   totalPings    Int
   insidePings   Int
   createdAt     DateTime        @default(now())
@@ -313,7 +313,7 @@ model DailyReport {
   id        String   @id @default(uuid())
   title     String
   date      String   @unique // Format: YYYY-MM-DD
-  pdfUrl    String   // Relative URL, e.g. "/uploads/reports/attendance-2026-06-22.pdf"
+  pdfUrl    String // Relative URL, e.g. "/uploads/reports/attendance-2026-06-22.pdf"
   createdAt DateTime @default(now())
 }
 

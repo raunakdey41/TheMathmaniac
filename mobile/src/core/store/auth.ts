@@ -33,6 +33,7 @@ interface AuthState {
 
   // Admin Actions
   adminCreateUser: (name: string, phoneNumber: string, role: string, email?: string, stream?: string, studentClass?: string, faculty?: string, school?: string, subjects?: string) => Promise<{ temporaryPassword: string; recoveryPassphrase: string } | null>;
+  adminUpdateUser: (userId: string, data: any) => Promise<boolean>;
   adminRecoverUser: (userId: string) => Promise<{ temporaryPassword: string; recoveryPassphrase: string } | null>;
   adminDeleteUser: (userId: string) => Promise<boolean>;
   adminListUsers: (query?: string, role?: string) => Promise<any[]>;
@@ -42,6 +43,7 @@ interface AuthState {
   adminAssignTeacher: (courseId: string, teacherId: string) => Promise<boolean>;
   adminRemoveTeacher: (courseId: string, teacherId: string) => Promise<boolean>;
   adminCreateCourse: (data: any) => Promise<boolean>;
+  adminUpdateCourse: (courseId: string, data: any) => Promise<boolean>;
   adminDeleteCourse: (courseId: string) => Promise<boolean>;
 }
 
@@ -212,6 +214,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
+  adminUpdateUser: async (userId, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      await apiClient.put(`/admin/users/${userId}`, data);
+      set({ isLoading: false });
+      return true;
+    } catch (error: any) {
+      const msg = error.response?.data?.error || error.message || 'Failed to update user';
+      set({ error: msg, isLoading: false });
+      return false;
+    }
+  },
+
   adminRecoverUser: async (userId) => {
     set({ isLoading: true, error: null });
     try {
@@ -329,6 +344,19 @@ export const useAuthStore = create<AuthState>((set) => ({
       return true;
     } catch (error: any) {
       const msg = error.response?.data?.error || error.message || 'Failed to create course';
+      set({ error: msg, isLoading: false });
+      return false;
+    }
+  },
+
+  adminUpdateCourse: async (courseId: string, data: any) => {
+    set({ isLoading: true, error: null });
+    try {
+      await apiClient.put(`/admin/courses/${courseId}`, data);
+      set({ isLoading: false });
+      return true;
+    } catch (error: any) {
+      const msg = error.response?.data?.error || error.message || 'Failed to update course';
       set({ error: msg, isLoading: false });
       return false;
     }

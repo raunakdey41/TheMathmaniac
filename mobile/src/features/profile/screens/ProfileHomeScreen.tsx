@@ -393,14 +393,21 @@ export const ProfileHomeScreen: React.FC = () => {
             {/* Attendance calendar component */}
             <AttendanceCalendar records={attendanceRecords} loading={attendanceLoading} />
 
-            {/* Admin Panel Button */}
-            {(profileData.profile.role === 'ADMIN' || (profileData.profile.phoneNumber && ['+917980357754', '+919831754957'].includes(profileData.profile.phoneNumber))) && (
+            {/* Action Buttons */}
+            <View className="mb-4 gap-y-4">
               <Button
-                title="Admin Control Panel"
-                onPress={() => navigation.navigate('AdminPanel')}
-                className="mb-4"
+                title="Change Password"
+                onPress={() => navigation.navigate('ChangePassword')}
               />
-            )}
+
+              {/* Admin Panel Button */}
+              {(profileData.profile.role === 'ADMIN' || (profileData.profile.phoneNumber && ['+917980357754', '+919831754957'].includes(profileData.profile.phoneNumber))) && (
+                <Button
+                  title="Admin Control Panel"
+                  onPress={() => navigation.navigate('AdminPanel')}
+                />
+              )}
+            </View>
 
             {/* Logout */}
             <Button title="Sign Out of Session" onPress={handleLogout} variant="danger" />

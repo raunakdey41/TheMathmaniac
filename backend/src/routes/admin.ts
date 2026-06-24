@@ -82,7 +82,7 @@ router.post('/users', authenticateJWT, requireAdmin, async (req: AuthenticatedRe
         class: role === 'STUDENT' && studentClass ? studentClass.trim() : null,
         faculty: role === 'STUDENT' && faculty ? faculty.trim() : null,
         school: role === 'STUDENT' && school ? school.trim() : null,
-        subjects: role === 'TEACHER' && subjects ? subjects.trim() : null,
+        subjects: subjects ? subjects.trim() : null,
       }
     });
 
@@ -569,6 +569,119 @@ router.delete('/courses/:id', authenticateJWT, async (req: AuthenticatedRequest,
   } catch (error) {
     console.error('Error deleting course:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// Update course (Superusers only)
+router.put('/courses/:id', authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.phoneNumber !== '+917980357754' && req.user?.phoneNumber !== '+919831754957') {
+      return res.status(403).json({ success: false, error: 'Access Denied: Only authorized superusers can update courses.' });
+    }
+
+    const { id } = req.params;
+    const { title, description, price, thumbnailUrl, categoryId, timeSlots, branch, targetClass, isBundle, bundleCourseIds } = req.body;
+
+    if (!title || !description || price === undefined) {
+      return res.status(400).json({ success: false, error: 'Title, description, and price are required.' });
+    }
+
+    // Prepare update data
+    const updateData: any = {
+      title: title.trim(),
+      description: description.trim(),
+      price: parseInt(price.toString(), 10),
+      thumbnailUrl: thumbnailUrl || null,
+      categoryId: categoryId || null,
+      timeSlots: timeSlots ? JSON.stringify(timeSlots) : '[]',
+      branch: branch || 'Sodepur',
+      targetClass: targetClass || null,
+      isBundle: !!isBundle,
+    };
+
+    // Update the course
+    const updatedCourse = await prisma.course.update({
+      where: { id },
+      data: updateData,
+    });
+
+    // Handle bundle items if applicable
+    if (isBundle && Array.isArray(bundleCourseIds)) {
+      // Delete existing bundle items first
+      await prisma.bundleItem.deleteMany({ where: { bundleId: id } });
+      
+      // Re-create bundle items
+      if (bundleCourseIds.length > 0) {
+        await prisma.bundleItem.createMany({
+          data: bundleCourseIds.map((cid: string) => ({
+            bundleId: id,
+            courseId: cid
+          }))
+        });
+      }
+    }
+
+    // Write to AuditLog
+    await prisma.auditLog.create({
+      data: {
+        action: 'COURSE_UPDATED',
+        userId: req.user.id,
+        actorId: req.user.id,
+        details: `Superuser updated course: ${updatedCourse.title}.`,
+      },
+    });
+
+    return res.status(200).json({ success: true, data: updatedCourse });
+  } catch (error: any) {
+    console.error('[Update Course Error]', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to update course.' });
+  }
+});
+
+// Update User Details (Admin Only)
+router.put('/users/:id', authenticateJWT, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, email, stream, class: studentClass, school, faculty, subjects } = req.body;
+
+    const existingUser = await prisma.user.findUnique({ where: { id } });
+    if (!existingUser) {
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        name: name?.trim() || existingUser.name,
+        email: email?.trim() || existingUser.email,
+        stream: stream?.trim() !== undefined ? stream.trim() : existingUser.stream,
+        class: studentClass?.trim() !== undefined ? studentClass.trim() : existingUser.class,
+        school: school?.trim() !== undefined ? school.trim() : existingUser.school,
+        faculty: faculty?.trim() !== undefined ? faculty.trim() : existingUser.faculty,
+        subjects: subjects?.trim() !== undefined ? subjects.trim() : existingUser.subjects,
+      },
+    });
+
+    // Write to AuditLog
+    await prisma.auditLog.create({
+      data: {
+        action: 'ADMIN_UPDATE_USER',
+        userId: id,
+        actorId: req.user!.id,
+        details: `Admin updated user details for ${updatedUser.name}.`,
+      },
+    });
+
+    // Sync to Firestore
+    await syncUserToFirestore(updatedUser);
+
+    return res.status(200).json({
+      success: true,
+      data: updatedUser,
+    });
+  } catch (error: any) {
+    console.error('[Admin Update User Error]', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to update user.' });
   }
 });
 

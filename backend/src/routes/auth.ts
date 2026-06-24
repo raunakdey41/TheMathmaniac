@@ -12,6 +12,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'mathemaniac_secret_key';
 const REFRESH_SECRET = process.env.REFRESH_SECRET || 'mathemaniac_refresh_key';
 const RESET_TOKEN_SECRET = JWT_SECRET + '_reset';
 
+function requireAdmin(req: AuthenticatedRequest, res: Response, next: any) {
+  if (req.user?.role !== 'ADMIN') {
+    return res.status(403).json({ success: false, error: 'Administrator access required.' });
+  }
+  next();
+}
+
 export async function syncUserToFirestore(
   user: { id: string; role: string },
   creds?: { phoneNumber?: string; passwordHash?: string; passphraseHash?: string }
